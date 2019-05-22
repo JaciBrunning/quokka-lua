@@ -99,8 +99,7 @@ These are the structures that occur in Lua bytecode. 'Dump' is the root type of 
 | Array of constants |
 
 ### Constant: 
-Each constant: 
-| Type | Desc |
+| Type | Desc |  
 | ---- | ---- |
 | Byte | Type Tag of constant (TValue), see TValues above |
 | Data | Not present if nil, Byte if T_BOOLEAN, Number if NumberFLT, Integer if NumberINT, String if Short/LongSTR |
