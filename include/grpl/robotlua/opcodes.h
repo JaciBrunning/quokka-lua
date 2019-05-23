@@ -1,9 +1,11 @@
 #pragma once
 
+#include "types.h"
+
 namespace grpl {
 namespace robotlua {
 // Directly taken from lopcodes.h in the Lua source
-enum class opmode { iABC, iABx, iAsBx, iAx };
+enum class opmode { iABC = 0, iABx, iAsBx, iAx };
 
 // Directly taken from lopcodes.h in the Lua source
 enum class opcode {
@@ -81,5 +83,56 @@ enum class opcode {
   OP_EXTRAARG /*	Ax	extra (larger) argument for previous opcode
                */
 };
+
+/*
+Instruction format (5.3):
+
+iABC    |       C(9)    | |       B(9)    | |     A(8)    | |   Op(6) |
+iABx    |              Bx(18)             | |     A(8)    | |   Op(6) |
+iAsBx   |             sBx (signed)(18)    | |     A(8)    | |   Op(6) |
+iAx     |                         Ax(26)                  | |   Op(6) |
+*/
+namespace opcode_util {
+
+inline uint8_t get_opcode(lua_instruction instruction) {
+  return instruction & 0b111111;
+}
+
+inline uint8_t get_A(lua_instruction instruction) {
+  return (instruction >> 6) & 0xFF;
+}
+
+inline uint16_t get_B(lua_instruction instruction) {
+  return (instruction >> (6 + 8 + 1)) & 0x1FF;
+}
+
+inline uint16_t get_C(lua_instruction instruction) {
+  return (instruction >> (6 + 8 + 1 + 8)) & 0x1FF;
+}
+
+inline uint32_t get_Bx(lua_instruction instruction) {
+  return (instruction >> (6 + 8)) & 0x3FFFF;
+}
+
+// excess-k format (offset binary)
+inline int32_t get_sBx(lua_instruction instruction) {
+  uint32_t v = (instruction >> (6 + 8)) & 0x3FFFF;
+  return (int32_t)v - (int32_t)(v & 0x20000);
+}
+
+inline uint32_t get_Ax(lua_instruction instruction) {
+  return (instruction >> 6) & 0x3FFFFFF;
+}
+
+inline uint8_t get_BC_value(uint16_t b_or_c) {
+  return b_or_c & 0xFF;
+}
+
+inline bool get_BC_is_reg(uint16_t b_or_c) {
+  return (b_or_c & 0x100) > 0;
+}
+
+}
+
 } // namespace robotlua
 } // namespace grpl
