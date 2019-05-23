@@ -45,19 +45,6 @@ struct bytecode_header {
   lua_number lnumber;
 };
 
-// TODO: Functions and Protos are circular dep?
-struct bytecode_constant {
-  uint8_t tag_type;
-  union {
-    bool value_bool;
-    lua_number value_num;
-    lua_integer value_int;
-    small_vector<char, 32> value_str;  // TODO: small_string
-  } data = {false};
-
-  // ~bytecode_constant();
-};
-
 struct bytecode_upvalue {
   uint8_t loc;
   uint8_t idx;
@@ -75,7 +62,7 @@ struct bytecode_function {
   small_vector<lua_instruction, 32> instructions;
   /* Constants */
   int num_constants;
-  small_vector<bytecode_constant, 32> constants;
+  small_vector<tvalue, 32> constants;
   /* Upvalues */
   int num_upvalues;
   small_vector<bytecode_upvalue, 32> upvalues;
@@ -97,17 +84,16 @@ class bytecode_reader {
  public:
   bytecode_reader(std::istream &stream);
 
+  void read_chunk(bytecode_chunk &chunk);
+
   void read_header(bytecode_header &header);
   void read_function(bytecode_architecture arch, bytecode_function &func);
-
-  void read_constant(bytecode_architecture arch, bytecode_constant &c);
 
   int read_native_int(bytecode_architecture arch);
   size_t read_sizet(bytecode_architecture arch);
   uint8_t read_byte();
   void read_block(uint8_t *out, size_t count);
 
-  void read_lua_string(bytecode_architecture arch, base_small_vector<char> &buffer);
   lua_instruction read_lua_instruction(bytecode_architecture arch);
   lua_integer read_lua_integer(bytecode_architecture arch);
   lua_number  read_lua_number(bytecode_architecture arch);

@@ -1,28 +1,11 @@
 #pragma once
 
 #include <stddef.h>
+#include <utility>
+#include <stdlib.h>
 
 namespace grpl {
 namespace robotlua {
-
-template<typename T>
-class base_small_vector {
- public:
-  virtual T& operator[](size_t pos) const = 0;
-  virtual void reserve(size_t size) = 0;
-  virtual size_t size() const = 0;
-  virtual bool is_stack() const = 0;
-
-  template<class... Args>
-  virtual T& emplace(size_t pos, Args&&... args) = 0;
-
-  template<class... Args>
-  T& emplace_back(Args&&... args) {
-    emplace(size(), std::forward<Args>(args)...);
-  }
-
-  virtual void clear();
-};
 /**
  * A vector that is stack-allocated up to a certain size, and is realloced
  * onto the heap if it becomes larger than the stack size. 
@@ -31,7 +14,7 @@ class base_small_vector {
  * platforms (like embedded systems).
  */
 template <typename T, size_t STACK_SIZE, size_t GROW_BY=STACK_SIZE>
-class small_vector : public base_small_vector<T> {
+class small_vector {
  public:
   small_vector() { }
 
@@ -53,18 +36,18 @@ class small_vector : public base_small_vector<T> {
     return *this;
   }
 
-  T& operator[](size_t pos) const override {
+  T& operator[](size_t pos) const {
     return active_buffer()[pos];
   }
 
-  void reserve(size_t size) override {
+  void reserve(size_t size) {
     if (size > _size) {
       grow(size);
     }
   }
 
   template<class... Args>
-  T& emplace(size_t pos, Args&&... args) override {
+  T& emplace(size_t pos, Args&&... args) {
     if (pos < _size) {
       (&active_buffer()[pos])->~T();
     }
@@ -79,19 +62,28 @@ class small_vector : public base_small_vector<T> {
     return *place;
   }
 
-  size_t size() const override {
+  template<class... Args>
+  T& emplace_back(Args&&... args) {
+    return emplace(size(), std::forward<Args>(args)...);
+  }
+
+  size_t size() const {
     return _size;
   }
 
-  bool is_stack() const override {
+  bool is_stack() const {
     return _heapvec == nullptr;
   }
 
-  void clear() override {
+  void clear() {
     for (size_t i = 0; i < _size; i++) {
       (&active_buffer()[i])->~T();
     }
     _size = 0;
+  }
+
+  T* raw_buffer() const {
+    return active_buffer();
   }
 
  protected:

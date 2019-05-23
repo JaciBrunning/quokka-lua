@@ -1,5 +1,14 @@
 #include "grpl/robotlua/bytecode.h"
 
+#include <byteswap.h>
+
+#ifdef ROBOTLUA_DEBUG
+  #include <stdio.h>
+  #define PDEBUG(...) printf(__VA_ARGS__);
+#else
+  #define PDEBUG(...)
+#endif
+
 using namespace grpl::robotlua;
 
 const bytecode_architecture bytecode_architecture::system() {
@@ -19,11 +28,64 @@ const bytecode_architecture bytecode_architecture::system() {
   return arch;
 }
 
-// bytecode_constant::~bytecode_constant() {
-//   // Dealloc the small vector if required
-// }
+/* READER */
+
+template<typename VT>
+static void read_lua_string(bytecode_reader &reader, bytecode_architecture arch, VT &vec) {
+  uint8_t b_size = reader.read_byte();
+  if (b_size == 0)
+    return;
+  if (b_size < 0xFF) {
+    // Small string
+    for (size_t i = 0; i < (size_t)b_size - 1; i++) 
+      vec.emplace_back((char)reader.read_byte());
+  } else {
+    // Long string
+    size_t size = reader.read_sizet(arch);
+    for (size_t i = 0; i < (size_t)size - 1; i++)
+      vec.emplace_back((char)reader.read_byte());
+  }
+}
+
+template<typename T>
+static T read_size(std::istream &stream) {
+  T t;
+  stream.read((char *)&t, sizeof(T));
+  return t;
+}
+
+template<typename T>
+static T read_numeric(std::istream &stream, bool little, uint8_t size_target, bool sys_little) {
+  uint8_t size_sys = (uint8_t)sizeof(T);
+  bool endian_match = little == sys_little;
+  if (endian_match && size_target == size_sys) {
+    return read_size<T>(stream);
+  } else if (size_target == sizeof(int16_t)) {
+    int16_t v = read_size<int16_t>(stream);
+    if (!endian_match)
+      v = __bswap_16(v);
+    return (T) v;
+  } else if (size_target == sizeof(int32_t)) {
+    int32_t v = read_size<int32_t>(stream);
+    if (!endian_match)
+      v = __bswap_32(v);
+    return (T) v;
+  } else if (size_target == sizeof(int64_t)) {
+    int64_t v = read_size<int64_t>(stream);
+    if (!endian_match)
+      v = __bswap_64(v);
+    return (T) v;
+  }
+  return 0;
+}
 
 bytecode_reader::bytecode_reader(std::istream &s) : _stream(s) { }
+
+void bytecode_reader::read_chunk(bytecode_chunk &chunk) {
+  read_header(chunk.header);
+  chunk.num_upvalues = read_byte();
+  read_function(chunk.header.arch, chunk.root_func);
+}
 
 void bytecode_reader::read_header(bytecode_header &data) {
   read_block((uint8_t *)data.signature, 4);
@@ -43,7 +105,7 @@ void bytecode_reader::read_header(bytecode_header &data) {
 }
 
 void bytecode_reader::read_function(bytecode_architecture arch, bytecode_function &func) {
-  read_lua_string(arch, func.source);
+  read_lua_string(*this, arch, func.source);
   func.line_defined = read_native_int(arch);
   func.last_line_defined = read_native_int(arch);
   func.num_params = read_byte();
@@ -55,14 +117,26 @@ void bytecode_reader::read_function(bytecode_architecture arch, bytecode_functio
     func.instructions.emplace_back(read_lua_instruction(arch));
   }
 
+  // Read constants directly since we need to change the emplace args.
   func.num_constants = read_native_int(arch);
   for (int i = 0; i < func.num_constants; i++) {
-
+    uint8_t type_tag = read_byte();
+    tag t = get_tag_from_tag_type(type_tag);
+    if (t == tag::BOOL) {
+      func.constants.emplace_back();
+    } else if (type_tag == construct_tag_type(tag::NUMBER, variant::NUM_FLOAT)) {
+      func.constants.emplace_back(read_lua_number(arch));
+    } else if (type_tag == construct_tag_type(tag::NUMBER, variant::NUM_INT)) {
+      func.constants.emplace_back(read_lua_integer(arch));
+    } else if (t == tag::STRING) {
+      tvalue &val = func.constants.emplace_back(type_tag);
+      read_lua_string(*this, arch, *val.value_string());
+    }
   }
 
   func.num_upvalues = read_native_int(arch);
   for (int i = 0; i < func.num_upvalues; i++) {
-    func.upvalues.emplace_back(read_byte(), read_byte());
+    func.upvalues.emplace_back(bytecode_upvalue{(uint8_t)read_byte(), (uint8_t)read_byte()});
   }
 
   func.num_protos = read_native_int(arch);
@@ -75,8 +149,7 @@ void bytecode_reader::read_function(bytecode_architecture arch, bytecode_functio
   /* Read debugging information */
   /* We ignore the debugging info, but we have to advance the 
      stream anyway */
-  // TODO: Change reads to not store any information.
-  // TODO: Does the C api need any info from this? Var names?
+  // TODO: Do we require this for C funcs to load info?
 
   small_vector<char, 32> tmp_vec;
   int num_opcode_map = read_native_int(arch);
@@ -85,7 +158,7 @@ void bytecode_reader::read_function(bytecode_architecture arch, bytecode_functio
 
   int num_locvar_map = read_native_int(arch);
   for (int i = 0; i < num_locvar_map; i++) {
-    read_lua_string(arch, tmp_vec);
+    read_lua_string(*this, arch, tmp_vec);
     read_native_int(arch);
     read_native_int(arch);
     tmp_vec.clear();
@@ -93,14 +166,9 @@ void bytecode_reader::read_function(bytecode_architecture arch, bytecode_functio
 
   int num_upval_map = read_native_int(arch);
   for (int i = 0; i < num_upval_map; i++) {
-    read_lua_string(arch, tmp_vec);
+    read_lua_string(*this, arch, tmp_vec);
     tmp_vec.clear();
   }
-}
-
-void bytecode_reader::read_constant(bytecode_architecture arch, bytecode_constant &c) {
-  uint8_t type_tag = read_byte();
-
 }
 
 int bytecode_reader::read_native_int(bytecode_architecture arch) {
@@ -115,14 +183,7 @@ int bytecode_reader::read_native_int(bytecode_architecture arch) {
 }
 
 size_t bytecode_reader::read_sizet(bytecode_architecture arch) {
-  if (arch.little == _sys_arch.little && arch.sizeof_sizet == _sys_arch.sizeof_sizet) {
-    size_t size;
-    _stream.read((char *)&size, sizeof(size_t));
-    return size;
-  } else {
-    // TODO:
-    return 0;
-  }
+  return read_numeric<size_t>(_stream, arch.little, arch.sizeof_sizet, _sys_arch.little);
 }
 
 uint8_t bytecode_reader::read_byte() {
@@ -134,43 +195,12 @@ void bytecode_reader::read_block(uint8_t *out, size_t count) {
     _stream.get(*(char *)(out + i));
 }
 
-void bytecode_reader::read_lua_string(bytecode_architecture arch, base_small_vector<char> &buffer) {
-  uint8_t b_size = read_byte();
-  if (b_size < 0xFF) {
-    // Small string
-    for (size_t i = 0; i < b_size - 1; i++) 
-      buffer.emplace_back((char)read_byte());
-  } else {
-    // Long string
-    size_t size = read_sizet(arch);
-    for (size_t i = 0; i < size - 1; i++)
-      buffer.emplace_back((char)read_byte());
-  }
-}
-
-// TODO: Can generify this?
 lua_instruction bytecode_reader::read_lua_instruction(bytecode_architecture arch) {
-  if (arch.little == _sys_arch.little && arch.sizeof_instruction == _sys_arch.sizeof_instruction) {
-    lua_instruction ins;
-    _stream.read((char *)&ins, sizeof(lua_instruction));
-    return ins;
-  } else {
-    // TODO:
-    return 0;
-  }
+  return read_numeric<lua_instruction>(_stream, arch.little, arch.sizeof_instruction, _sys_arch.little);
 }
 
 lua_integer bytecode_reader::read_lua_integer(bytecode_architecture arch) {
-  if (arch.little == _sys_arch.little && arch.sizeof_lua_integer == _sys_arch.sizeof_lua_integer) {
-    // Read directly from stream
-    lua_integer theint;
-    _stream.read((char *)&theint, sizeof(lua_integer));
-    return theint;
-  } else {
-    // Need magic
-    // TODO:
-    return 0;
-  }
+  return read_numeric<lua_integer>(_stream, arch.little, arch.sizeof_lua_integer, _sys_arch.little);
 }
 
 lua_number bytecode_reader::read_lua_number(bytecode_architecture arch) {
