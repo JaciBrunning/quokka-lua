@@ -95,7 +95,7 @@ These are the structures that occur in Lua bytecode. 'Dump' is the root type of 
 ## Constants (DumpConstants)
 | Type | Desc |
 | ---- | ---- |
-| Int | Number of upvalues |
+| Int | Number of constants |
 | Array of constants |
 
 ### Constant: 

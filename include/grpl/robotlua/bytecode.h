@@ -5,6 +5,7 @@
 #include <istream>
 
 #include "smallvector.h"
+#include "types.h"
 
 // We use constexpr if, assuming it's available.
 #ifndef IF_CONSTEXPR
@@ -19,11 +20,6 @@
 
 namespace grpl {
 namespace robotlua {
-
-// We store Instructions and Integers as the value of size_t - 32 on 32-bit platforms and 64 on 64-bit platforms.
-typedef size_t lua_instruction;
-typedef int lua_integer;
-typedef double lua_number;   // TODO: Add define arg for float?
 
 struct bytecode_architecture {
   bool little;
@@ -50,7 +46,6 @@ struct bytecode_header {
 };
 
 // TODO: Functions and Protos are circular dep?
-
 struct bytecode_constant {
   uint8_t tag_type;
   union {
@@ -58,7 +53,9 @@ struct bytecode_constant {
     lua_number value_num;
     lua_integer value_int;
     small_vector<char, 32> value_str;  // TODO: small_string
-  } data;
+  } data = {false};
+
+  // ~bytecode_constant();
 };
 
 struct bytecode_upvalue {
@@ -102,6 +99,8 @@ class bytecode_reader {
 
   void read_header(bytecode_header &header);
   void read_function(bytecode_architecture arch, bytecode_function &func);
+
+  void read_constant(bytecode_architecture arch, bytecode_constant &c);
 
   int read_native_int(bytecode_architecture arch);
   size_t read_sizet(bytecode_architecture arch);

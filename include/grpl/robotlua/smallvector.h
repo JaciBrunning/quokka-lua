@@ -17,7 +17,7 @@ class base_small_vector {
   virtual T& emplace(size_t pos, Args&&... args) = 0;
 
   template<class... Args>
-  virtual T& emplace_back(Args&&... args) {
+  T& emplace_back(Args&&... args) {
     emplace(size(), std::forward<Args>(args)...);
   }
 
@@ -33,12 +33,24 @@ class base_small_vector {
 template <typename T, size_t STACK_SIZE, size_t GROW_BY=STACK_SIZE>
 class small_vector : public base_small_vector<T> {
  public:
-  small_vector() {
+  small_vector() { }
 
+  small_vector(const small_vector &other) {
+    reserve(other.size());
+    for (int i = 0; i < other.size(); i++)
+      emplace_back(other[i]);
   }
 
   ~small_vector() {
     clear_elements();
+  }
+
+  small_vector &operator=(const small_vector &other) {
+    clear();
+    reserve(other.size());
+    for (int i = 0; i < other.size(); i++)
+      emplace_back(other[i]);
+    return *this;
   }
 
   T& operator[](size_t pos) const override {

@@ -19,6 +19,10 @@ const bytecode_architecture bytecode_architecture::system() {
   return arch;
 }
 
+// bytecode_constant::~bytecode_constant() {
+//   // Dealloc the small vector if required
+// }
+
 bytecode_reader::bytecode_reader(std::istream &s) : _stream(s) { }
 
 void bytecode_reader::read_header(bytecode_header &data) {
@@ -48,12 +52,12 @@ void bytecode_reader::read_function(bytecode_architecture arch, bytecode_functio
 
   func.num_instructions = read_native_int(arch);
   for (int i = 0; i < func.num_instructions; i++) {
-
+    func.instructions.emplace_back(read_lua_instruction(arch));
   }
 
   func.num_constants = read_native_int(arch);
   for (int i = 0; i < func.num_constants; i++) {
-    func.instructions.emplace_back(read_lua_instruction(arch));
+
   }
 
   func.num_upvalues = read_native_int(arch);
@@ -92,6 +96,11 @@ void bytecode_reader::read_function(bytecode_architecture arch, bytecode_functio
     read_lua_string(arch, tmp_vec);
     tmp_vec.clear();
   }
+}
+
+void bytecode_reader::read_constant(bytecode_architecture arch, bytecode_constant &c) {
+  uint8_t type_tag = read_byte();
+
 }
 
 int bytecode_reader::read_native_int(bytecode_architecture arch) {
