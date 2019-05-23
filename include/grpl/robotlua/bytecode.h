@@ -7,17 +7,6 @@
 #include "smallvector.h"
 #include "types.h"
 
-// We use constexpr if, assuming it's available.
-#ifndef IF_CONSTEXPR
-  // C++17
-  #if __cplusplus >= 201703L
-    #define IF_CONSTEXPR_AVAILABLE
-    #define IF_CONSTEXPR if constexpr
-  #else
-    #define IF_CONSTEXPR if
-  #endif
-#endif
-
 namespace grpl {
 namespace robotlua {
 
@@ -84,21 +73,44 @@ class bytecode_reader {
  public:
   bytecode_reader(std::istream &stream);
 
-  void read_chunk(bytecode_chunk &chunk);
+  void read_chunk(bytecode_chunk &);
 
-  void read_header(bytecode_header &header);
-  void read_function(bytecode_architecture arch, bytecode_function &func);
+  void read_header(bytecode_header &);
+  void read_function(bytecode_architecture, bytecode_function &);
 
-  int read_native_int(bytecode_architecture arch);
-  size_t read_sizet(bytecode_architecture arch);
   uint8_t read_byte();
-  void read_block(uint8_t *out, size_t count);
+  void    read_block(uint8_t *out, size_t count);
+  int     read_native_int(bytecode_architecture);
+  size_t  read_sizet(bytecode_architecture);
 
-  lua_instruction read_lua_instruction(bytecode_architecture arch);
-  lua_integer read_lua_integer(bytecode_architecture arch);
-  lua_number  read_lua_number(bytecode_architecture arch);
+  lua_instruction read_lua_instruction(bytecode_architecture);
+  lua_integer     read_lua_integer(bytecode_architecture);
+  lua_number      read_lua_number(bytecode_architecture);
  private:
   std::istream &_stream;
+  const bytecode_architecture _sys_arch = bytecode_architecture::system();
+};
+
+class bytecode_writer {
+ public:
+  bytecode_writer(std::ostream &stream, bytecode_architecture target_arch);
+
+  void write_chunk(bytecode_chunk &);
+
+  void write_header(bytecode_header &);
+  void write_function(bytecode_function &);
+
+  void write_byte(uint8_t);
+  void write_block(uint8_t *buf, size_t count);
+  void write_native_int(int);
+  void write_sizet(size_t);
+
+  void write_lua_instruction(lua_instruction);
+  void write_lua_integer(lua_integer);
+  void write_lua_number(lua_number);
+ private:
+  std::ostream &_stream;
+  bytecode_architecture _target_arch;
   const bytecode_architecture _sys_arch = bytecode_architecture::system();
 };
 
