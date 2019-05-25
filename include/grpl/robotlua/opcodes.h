@@ -94,20 +94,27 @@ iAx     |                         Ax(26)                  | |   Op(6) |
 */
 namespace opcode_util {
 
-inline uint8_t get_opcode(lua_instruction instruction) {
-  return instruction & 0b111111;
+struct refreg {
+  bool is_const;
+  uint8_t val;
+};
+
+inline opcode get_opcode(lua_instruction instruction) {
+  return (opcode)(instruction & 0b111111);
 }
 
 inline uint8_t get_A(lua_instruction instruction) {
   return (instruction >> 6) & 0xFF;
 }
 
-inline uint16_t get_B(lua_instruction instruction) {
-  return (instruction >> (6 + 8 + 1)) & 0x1FF;
+inline refreg get_B(lua_instruction instruction) {
+  uint16_t b = (instruction >> (6 + 8 + 1)) & 0x1FF;
+  return { (b & 0x100) > 0, b & 0xFF };
 }
 
-inline uint16_t get_C(lua_instruction instruction) {
-  return (instruction >> (6 + 8 + 1 + 8)) & 0x1FF;
+inline refreg get_C(lua_instruction instruction) {
+  uint16_t c = (instruction >> (6 + 8 + 1 + 8)) & 0x1FF;
+  return { (c & 0x100) > 0, c & 0xFF };
 }
 
 inline uint32_t get_Bx(lua_instruction instruction) {
@@ -122,14 +129,6 @@ inline int32_t get_sBx(lua_instruction instruction) {
 
 inline uint32_t get_Ax(lua_instruction instruction) {
   return (instruction >> 6) & 0x3FFFFFF;
-}
-
-inline uint8_t get_BC_value(uint16_t b_or_c) {
-  return b_or_c & 0xFF;
-}
-
-inline bool get_BC_is_reg(uint16_t b_or_c) {
-  return (b_or_c & 0x100) > 0;
 }
 
 }

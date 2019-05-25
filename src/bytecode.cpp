@@ -1,8 +1,23 @@
 #include "grpl/robotlua/bytecode.h"
 
-#include <byteswap.h>
-
 using namespace grpl::robotlua;
+
+#if defined(__APPLE__)
+#include <libkern/OSByteOrder.h>
+static inline uint16_t __bswap_16(uint16_t v) {
+  return OSSwapInt16(v);
+}
+
+static inline uint32_t __bswap_32(uint32_t v) {
+  return OSSwapInt32(v);
+}
+
+static inline uint64_t __bswap_64(uint64_t v) {
+  return OSSwapInt64(v);
+}
+#else
+#include <byteswap.h>
+#endif
 
 const bytecode_architecture bytecode_architecture::system() {
   union {
@@ -188,7 +203,7 @@ lua_integer bytecode_reader::read_lua_integer(bytecode_architecture arch) {
 }
 
 lua_number bytecode_reader::read_lua_number(bytecode_architecture arch) {
-  lua_number number;
+  lua_number number = 0;
   if (arch.sizeof_lua_number == _sys_arch.sizeof_lua_number) {
     // Shortcut if it's equal
     _stream.read((char *)&number, sizeof(lua_number));
