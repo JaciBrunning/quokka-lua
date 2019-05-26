@@ -109,12 +109,12 @@ inline uint8_t get_A(lua_instruction instruction) {
 
 inline refreg get_B(lua_instruction instruction) {
   uint16_t b = (instruction >> (6 + 8 + 1)) & 0x1FF;
-  return { (b & 0x100) > 0, b & 0xFF };
+  return { (b & 0x100) > 0, (uint8_t)(b & 0xFF) };
 }
 
 inline refreg get_C(lua_instruction instruction) {
   uint16_t c = (instruction >> (6 + 8 + 1 + 8)) & 0x1FF;
-  return { (c & 0x100) > 0, c & 0xFF };
+  return { (c & 0x100) > 0, (uint8_t)(c & 0xFF) };
 }
 
 inline uint32_t get_Bx(lua_instruction instruction) {

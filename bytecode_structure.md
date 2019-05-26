@@ -113,8 +113,8 @@ These are the structures that occur in Lua bytecode. 'Dump' is the root type of 
 ### Upvalue:
 | Type | Desc |
 | ---- | ---- |
-| Byte | Location in stack |
-| Byte | Idx of upvalue |
+| Byte | Is the upval in stack? (local variable). If not, go another layer up until you find it. |
+| Byte | Idx of upvalue, relative to the base of the calling function. |
 
 ## Protos (DumpProtos)
 Protos are just another name for internal functions. In this case, this is really just a function table.

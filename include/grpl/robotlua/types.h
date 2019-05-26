@@ -1,8 +1,10 @@
 #pragma once
 
 #include <stdint.h>
+#include <functional>
 
 #include "smallvector.h"
+#include "simplevariant.h"
 
 namespace grpl {
 namespace robotlua {
@@ -38,24 +40,33 @@ namespace robotlua {
     FUNC_C       = 2
   };
 
+  struct lua_lclosure {
+    size_t proto_idx;
+    small_vector<size_t, 4> upval_refs;
+  };
+
+  struct lua_native_closure {
+    std::function<void()> func;
+  };
+
+  struct lua_closure {
+    simple_variant<lua_lclosure, lua_native_closure> impl;
+  };
+
   inline uint8_t construct_tag_type(tag t, variant v = variant::NONE) {
     return (uint8_t)t | ((uint8_t)v << 4);
   }
 
   inline tag get_tag_from_tag_type(uint8_t tag_type) { return (tag)(tag_type & 0x0F); }
+  inline variant get_variant_from_tag_type(uint8_t tag_type) {
+    return (variant)(tag_type >> 4);
+  }
 
   struct tvalue {
     using string_vec = small_vector<char, 32>;
 
     uint8_t tag_type;
-    // TODO: Userdata
-    union {
-      bool        value_bool;
-      lua_number  value_num;
-      lua_integer value_int;
-      // Is actually of type small_vec, but needs to be a buffer so we can use placement new
-      char value_str_buf[sizeof(string_vec)];
-    } data;
+    simple_variant<bool, lua_number, lua_integer, string_vec, lua_closure> data;
 
     tvalue();             // Nil
     tvalue(bool);         // Bool
@@ -63,10 +74,7 @@ namespace robotlua {
     tvalue(lua_number);   // Float
 
     tvalue(uint8_t tagt);  // String, Func, Table, Userdata
-
-    ~tvalue();
-
-    small_vector<char, 32> *value_string();
   };
+
 }  // namespace robotlua
 }  // namespace grpl

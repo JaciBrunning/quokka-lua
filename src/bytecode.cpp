@@ -112,7 +112,7 @@ void bytecode_reader::read_header(bytecode_header &data) {
   data.lnumber = read_lua_number(data.arch);
 }
 
-void bytecode_reader::read_function(bytecode_architecture arch, bytecode_function &func) {
+void bytecode_reader::read_function(bytecode_architecture arch, bytecode_prototype &func) {
   read_lua_string(*this, arch, func.source);
   func.line_defined = read_native_int(arch);
   func.last_line_defined = read_native_int(arch);
@@ -138,18 +138,19 @@ void bytecode_reader::read_function(bytecode_architecture arch, bytecode_functio
       func.constants.emplace_back(read_lua_integer(arch));
     } else if (t == tag::STRING) {
       tvalue &val = func.constants.emplace_back(type_tag);
-      read_lua_string(*this, arch, *val.value_string());
+      // read_lua_string(*this, arch, *val.value_string());
+      read_lua_string(*this, arch, val.data.get<tvalue::string_vec>());
     }
   }
 
   func.num_upvalues = read_native_int(arch);
   for (int i = 0; i < func.num_upvalues; i++) {
-    func.upvalues.emplace_back(bytecode_upvalue{(uint8_t)read_byte(), (uint8_t)read_byte()});
+    func.upvalues.emplace_back(bytecode_upvalue{read_byte() > 0, (uint8_t)read_byte()});
   }
 
   func.num_protos = read_native_int(arch);
   for (int i = 0; i < func.num_protos; i++) {
-    bytecode_function *f = new bytecode_function();
+    bytecode_prototype *f = new bytecode_prototype();
     read_function(arch, *f);
     func.protos.emplace_back(f);
   }
@@ -286,7 +287,7 @@ void bytecode_writer::write_header(bytecode_header &header) {
   write_lua_number(header.lnumber);
 }
 
-void bytecode_writer::write_function(bytecode_function &func) {
+void bytecode_writer::write_function(bytecode_prototype &func) {
   write_lua_string(*this, func.source);
 
   write_native_int(func.line_defined);
@@ -308,20 +309,20 @@ void bytecode_writer::write_function(bytecode_function &func) {
     write_byte(tv.tag_type);
     tag t = get_tag_from_tag_type(tv.tag_type);
     if (t == tag::BOOL) {
-      write_byte(tv.data.value_bool ? 1 : 0);
+      write_byte(tv.data.get<bool>() ? 1 : 0);
     } else if (tv.tag_type == construct_tag_type(tag::NUMBER, variant::NUM_FLOAT)) {
-      write_lua_number(tv.data.value_num);
+      write_lua_number(tv.data.get<lua_number>());
     } else if (tv.tag_type == construct_tag_type(tag::NUMBER, variant::NUM_INT)) {
-      write_lua_integer(tv.data.value_int);
+      write_lua_integer(tv.data.get<lua_integer>());
     } else if (t == tag::STRING) {
-      write_lua_string(*this, *tv.value_string());
+      write_lua_string(*this, tv.data.get<tvalue::string_vec>());
     }
   }
 
   // Upvals
   write_native_int(func.num_upvalues);
   for (int i = 0; i < func.num_upvalues; i++) {
-    write_byte(func.upvalues[i].loc);
+    write_byte(func.upvalues[i].instack ? 1 : 0);
     write_byte(func.upvalues[i].idx);
   }
 

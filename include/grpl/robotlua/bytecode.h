@@ -35,11 +35,13 @@ struct bytecode_header {
 };
 
 struct bytecode_upvalue {
-  uint8_t loc;
+  bool instack;
   uint8_t idx;
 };
 
-struct bytecode_function {
+// Prototype is a description of a Lua function, providing its layout in 
+// bytecode, but without any of its runtime features
+struct bytecode_prototype {
   small_vector<char, 32> source; // TODO: small_string
   int line_defined;
   int last_line_defined;
@@ -54,19 +56,19 @@ struct bytecode_function {
   small_vector<tvalue, 32> constants;
   /* Upvalues */
   int num_upvalues;
-  small_vector<bytecode_upvalue, 32> upvalues;
+  small_vector<bytecode_upvalue, 4> upvalues;
   /* Protos */
   /* Unfortunately this is recursive, so we have to 
      have some heap allocations */
   int num_protos;
-  small_vector<bytecode_function *, 32> protos;
+  small_vector<bytecode_prototype *, 16> protos;    // TODO: memory leak here - functions are alloc'ed in heap.
   // Debugging information is ignored, but still must be parsed.
 };
 
 struct bytecode_chunk {
   bytecode_header header;
   uint8_t num_upvalues;
-  bytecode_function root_func;
+  bytecode_prototype root_func;
 };
 
 class bytecode_reader {
@@ -76,7 +78,7 @@ class bytecode_reader {
   void read_chunk(bytecode_chunk &);
 
   void read_header(bytecode_header &);
-  void read_function(bytecode_architecture, bytecode_function &);
+  void read_function(bytecode_architecture, bytecode_prototype &);
 
   uint8_t read_byte();
   void    read_block(uint8_t *out, size_t count);
@@ -98,7 +100,7 @@ class bytecode_writer {
   void write_chunk(bytecode_chunk &);
 
   void write_header(bytecode_header &);
-  void write_function(bytecode_function &);
+  void write_function(bytecode_prototype &);
 
   void write_byte(uint8_t);
   void write_block(uint8_t *buf, size_t count);
