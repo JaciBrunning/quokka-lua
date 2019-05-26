@@ -62,18 +62,69 @@ namespace robotlua {
     return (variant)(tag_type >> 4);
   }
 
+  // TODO: As keys, integer, number, boolean, and string, all work based
+  // on equality
+  struct lua_table {
+    struct node {
+      // Pointer to the global table store
+      size_t key_ref;
+      // Pointer to the global table store
+      size_t value_ref;
+    };
+    small_vector<node, 16> entries;
+
+    // template<typename STORAGE>
+    // void set(STORAGE store, tvalue *key, tvalue *value) {
+      
+    // }
+  };
+
+  // TODO: NEED an iterator type, otherwise this gets way harder.
+
+  /**
+   * Lua objects are datatypes that are described by more than just their value. Unline
+   * numbers, strings, and booleans, objects can be complex, such as Tables. 
+   * 
+   * In RobotLua, objects are allocated into one large pool (analogous to the heap),
+   * and automatically dealloced when their usages reach zero. Note that objects are distinct
+   * to upvalues, as objects do not (on their own) go above their own scope unless they are
+   * used in an upvalue. 
+   * 
+   * A value may hold an object, but an object is not a value.
+   */
+  struct lua_object {
+    uint8_t tag_type;
+    simple_variant<lua_table, lua_closure> data;
+    size_t refcount;
+
+    lua_object(uint8_t tagt);
+  };
+
   struct tvalue {
     using string_vec = small_vector<char, 32>;
 
     uint8_t tag_type;
-    simple_variant<bool, lua_number, lua_integer, string_vec, lua_closure> data;
+    /**
+     * no type: Nil
+     * bool: Boolean
+     * lua_number: Number (float)
+     * lua_integer: Number (integer)
+     * string_vec: String
+     * size_t: Index in object store
+     */
+    simple_variant<bool, lua_number, lua_integer, string_vec, size_t> data;
 
     tvalue();             // Nil
     tvalue(bool);         // Bool
     tvalue(lua_integer);  // Int
     tvalue(lua_number);   // Float
 
-    tvalue(uint8_t tagt);  // String, Func, Table, Userdata
+    tvalue(uint8_t tagt);  // String, object
+
+    ~tvalue();
+
+    void set_object(size_t position, lua_object &obj);
+    bool operator==(const tvalue &) const;
   };
 
 }  // namespace robotlua

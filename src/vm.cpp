@@ -1,12 +1,31 @@
-// #include "grpl/robotlua/vm.h"
+#include "grpl/robotlua/vm.h"
 
-// using namespace grpl::robotlua;
+using namespace grpl::robotlua;
 
-// vm::vm() { }
+vm::vm() {
+  // Load distinguished env.
+  _distinguished_env.tag_type = construct_tag_type(tag::TABLE);
+  lua_table &t = _distinguished_env.data.emplace<lua_table>();
+  
+}
 
-// void vm::load(bytecode_chunk &bytecode) {
+void vm::load(bytecode_chunk &bytecode) {
+  // TODO: Check header
 
-// }
+  // Add prototype to _rootprotos
+  size_t proto_slot = first_avail_idx(_rootprotos);
+  _rootprotos[proto_slot].emplace<bytecode_prototype>(bytecode.root_func);
+  // Add closure to top of register stack
+  tvalue &clv = _registers.emplace_back(construct_tag_type(tag::FUNC, variant::FUNC_LUA));
+  clv.func().get<lua_lclosure>().proto_idx = proto_slot;
+  // Assign upvals
+  // bytecode.num_upvals and bytecode.root_proto.num_upvalues are always the same
+  for (size_t i = 0; i < bytecode.num_upvalues; i++) {
+    size_t next_slot = first_avail_idx(_upvals);
+    lua_upval &luv = _upvals[next_slot].emplace<lua_upval>();
+    // luv.value.emplace<tvalue>();  // nil
+  }
+}
 
 // void vm::execute() {
 //   opcode code = opcode_util::get_opcode(instruction);

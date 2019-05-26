@@ -16,7 +16,7 @@ namespace robotlua {
 
   template <typename U, typename... T>
   struct variant_funcs<U, T...> {
-    inline static void copy(size_t id, char *src, char *dst) {
+    inline static void copy(size_t id, const char *src, char *dst) {
       if (id == typeid(U).hash_code())
         ::new (dst) U(*reinterpret_cast<const U *>(src));  // call copy
       else
@@ -67,7 +67,7 @@ namespace robotlua {
   // For when all options are exhaused (i.e. none type)
   template <>
   struct variant_funcs<> {
-    inline static void copy(size_t, char *, char *) {}
+    inline static void copy(size_t, const char *, char *) {}
     inline static void move(size_t, char *, char *) {}
     inline static void destroy(size_t, char *) {}
   };
@@ -127,18 +127,22 @@ namespace robotlua {
       return get<U>();
     }
 
+    void unassign() {
+      variant_func_t::destroy(_type_id, &_data_raw[0]);
+      _type_id = typeid(void).hash_code();
+    }
+
     template <typename U, typename = typename std::enable_if<type_in<U, T...>::value>::type>
-    U &get() {
+    U &get() const {
       return *reinterpret_cast<U *>(&_data_raw[0]);
     }
 
     template <typename U>
-    bool is() {
+    bool is() const {
       return (_type_id == typeid(U).hash_code());
     }
 
-    bool is_assigned() { return (_type_id != typeid(void).hash_code()); }
+    bool is_assigned() const { return (_type_id != typeid(void).hash_code()); }
   };
-
 }  // namespace robotlua
 }  // namespace grpl

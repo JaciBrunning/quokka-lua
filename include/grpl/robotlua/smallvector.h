@@ -7,43 +7,6 @@
 namespace grpl {
 namespace robotlua {
 /**
- * Provides a mechanism for optional elements inside of an array, without fragmenting
- * across memory.
- */
-template<typename T>
-class slot {
- public:
-  bool present;
-  char buf[sizeof(T)];
-
-  slot() : present(false) {} 
-
-  template<class... Args>
-  slot(Args&&... args) : present(true) {
-    emplace(std::forward<Args>(args)...);
-  }
-
-  ~slot() {
-    clear();
-  }
-
-  template<class... Args>
-  T &emplace(Args&&... args) {
-    clear();
-    new(value()) T(std::forward<Args>(args)...);
-  }
-
-  void clear() {
-    if (present)
-      value()->~T();
-  }
-
-  T *value() const {
-    return reinterpret_cast<T *>(buf);
-  }
-};
-
-/**
  * A vector that is stack-allocated up to a certain size, and is realloced
  * onto the heap if it becomes larger than the stack size. 
  * 
@@ -57,7 +20,7 @@ class small_vector {
 
   small_vector(const small_vector &other) {
     reserve(other.size());
-    for (int i = 0; i < other.size(); i++)
+    for (size_t i = 0; i < other.size(); i++)
       emplace_back(other[i]);
   }
 
