@@ -16,6 +16,13 @@ namespace robotlua {
 template <typename T, size_t STACK_SIZE, size_t GROW_BY=STACK_SIZE>
 class small_vector {
  public:
+  // A reference to a certain element in a small_vector, that is not invalidated
+  // like a regular iterator when the vector changes internal layout.
+  struct continuous_reference {
+    small_vector &vec;
+    size_t idx;
+  };
+
   small_vector() { }
 
   small_vector(const small_vector &other) {

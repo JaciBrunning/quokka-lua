@@ -79,8 +79,6 @@ namespace robotlua {
     // }
   };
 
-  // TODO: NEED an iterator type, otherwise this gets way harder.
-
   /**
    * Lua objects are datatypes that are described by more than just their value. Unline
    * numbers, strings, and booleans, objects can be complex, such as Tables. 
