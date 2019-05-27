@@ -88,7 +88,7 @@ namespace robotlua {
    * to upvalues, as objects do not (on their own) go above their own scope unless they are
    * used in an upvalue. 
    * 
-   * A value may hold an object, but an object is not a value.
+   * A value may hold an object (or rather, a reference to an object), but an object is not a value.
    */
   struct lua_object {
     uint8_t tag_type;
