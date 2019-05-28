@@ -6,6 +6,34 @@
 
 namespace grpl {
 namespace robotlua {
+
+template <typename T>
+class small_vector_base {
+ public:
+  // A reference to a certain element in a small_vector, that is not invalidated
+  // like a regular iterator when the vector changes internal layout.
+  struct continuous_reference {
+    small_vector_base *vec;
+    size_t idx;
+
+    T *operator*() const {
+      return &vec->operator[](idx);
+    }
+
+    T* get() const {
+      return &vec->operator[](idx);
+    }
+
+    bool operator==(const continuous_reference &other) const {
+      return (vec == other.vec) && (idx == other.idx);
+    }
+  };
+
+  virtual T& operator[](size_t) const = 0;
+  virtual void reserve(size_t) = 0;
+  virtual size_t size() const = 0;
+};
+
 /**
  * A vector that is stack-allocated up to a certain size, and is realloced
  * onto the heap if it becomes larger than the stack size. 
@@ -14,15 +42,8 @@ namespace robotlua {
  * platforms (like embedded systems).
  */
 template <typename T, size_t STACK_SIZE, size_t GROW_BY=STACK_SIZE>
-class small_vector {
+class small_vector : public small_vector_base<T> {
  public:
-  // A reference to a certain element in a small_vector, that is not invalidated
-  // like a regular iterator when the vector changes internal layout.
-  struct continuous_reference {
-    small_vector &vec;
-    size_t idx;
-  };
-
   small_vector() { }
 
   small_vector(const small_vector &other) {
@@ -43,11 +64,11 @@ class small_vector {
     return *this;
   }
 
-  T& operator[](size_t pos) const {
+  T& operator[](size_t pos) const override {
     return active_buffer()[pos];
   }
 
-  void reserve(size_t size) {
+  void reserve(size_t size) override {
     if (size > _size) {
       grow(size);
     }
@@ -74,7 +95,7 @@ class small_vector {
     return emplace(size(), std::forward<Args>(args)...);
   }
 
-  size_t size() const {
+  size_t size() const override {
     return _size;
   }
 

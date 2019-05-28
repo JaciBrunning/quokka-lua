@@ -67,7 +67,9 @@ namespace robotlua {
   // Our equivilent of lua_state
   class vm {
    public:
+    vm();
     void load(bytecode_chunk &);
+    object_store_ref alloc_object();
    private:
     /**
      * Find the next available 'slot' in a vector that contains single-element
@@ -86,7 +88,7 @@ namespace robotlua {
       return slot;
     }
 
-    small_vector<tvalue, 128> _registers;
+    small_vector<tvalue, 48> _registers;
     // Upval storage - used for variables that transcend the normal scope. 
     // e.g. local variables in ownership by an anonymous function
     small_vector<simple_variant<lua_upval>, 16> _upvals;
@@ -94,7 +96,7 @@ namespace robotlua {
     // definition) of loaded files. Referenced by lua_lclosure
     small_vector<simple_variant<bytecode_prototype>, 4> _rootprotos;
     // Store for objects
-    small_vector<simple_variant<lua_object>, 32> _objects;
+    small_vector<lua_object, 16> _objects;
 
     /**
      * In Lua, all loaded files have a single upvalue - the _ENV (environment).

@@ -5,8 +5,9 @@ using namespace grpl::robotlua;
 vm::vm() {
   // Load distinguished env.
   _distinguished_env.tag_type = construct_tag_type(tag::TABLE);
-  lua_table &t = _distinguished_env.data.emplace<lua_table>();
-  
+  object_store_ref objstore = alloc_object();
+  (*objstore)->new_table();
+  _distinguished_env = tvalue(objstore);
 }
 
 void vm::load(bytecode_chunk &bytecode) {
@@ -16,8 +17,9 @@ void vm::load(bytecode_chunk &bytecode) {
   size_t proto_slot = first_avail_idx(_rootprotos);
   _rootprotos[proto_slot].emplace<bytecode_prototype>(bytecode.root_func);
   // Add closure to top of register stack
-  tvalue &clv = _registers.emplace_back(construct_tag_type(tag::FUNC, variant::FUNC_LUA));
-  clv.func().get<lua_lclosure>().proto_idx = proto_slot;
+  object_store_ref root_lua_func = alloc_object();
+  (*root_lua_func)->new_lclosure().proto_idx = proto_slot;
+  _registers.emplace_back(root_lua_func);
   // Assign upvals
   // bytecode.num_upvals and bytecode.root_proto.num_upvalues are always the same
   for (size_t i = 0; i < bytecode.num_upvalues; i++) {
@@ -25,6 +27,16 @@ void vm::load(bytecode_chunk &bytecode) {
     lua_upval &luv = _upvals[next_slot].emplace<lua_upval>();
     // luv.value.emplace<tvalue>();  // nil
   }
+}
+
+object_store_ref vm::alloc_object() {
+  for (size_t i = 0; i < _objects.size(); i++) {
+    if (_objects[i].is_free)
+      return object_store_ref(&_objects, i);
+  }
+  // Didn't find a free slot, emplace an object and use that.
+  _objects.emplace_back();
+  return object_store_ref(&_objects, _objects.size() - 1);
 }
 
 // void vm::execute() {

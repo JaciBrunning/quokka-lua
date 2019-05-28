@@ -60,21 +60,62 @@ namespace robotlua {
     return (variant)(tag_type >> 4);
   }
 
-  // TODO: As keys, integer, number, boolean, and string, all work based
-  // on equality
+  struct lua_object;
+
+  // Store object reference with refcount.
+  struct object_store_ref : small_vector_base<lua_object>::continuous_reference {
+    object_store_ref() = delete;
+
+    object_store_ref(small_vector_base<lua_object> *v, size_t id) {
+      vec = v;
+      idx = idx;
+      get()->use();
+    }
+
+    object_store_ref(const object_store_ref &other) : object_store_ref(other.vec, other.idx) { }
+    object_store_ref(object_store_ref &&other) : object_store_ref(other.vec, other.idx) { }
+
+    ~object_store_ref() {
+      get()->unuse();
+    }
+  };
+
+  struct tvalue {
+    using string_vec = small_vector<char, 32>;
+
+    uint8_t tag_type;
+    /**
+     * no type: Nil
+     * bool: Boolean
+     * lua_number: Number (float)
+     * lua_integer: Number (integer)
+     * string_vec: String
+     * object_store_ref: Ref to lua_object in object store
+     */
+    simple_variant<bool, lua_number, lua_integer, string_vec, object_store_ref> data;
+
+    tvalue();             // Nil
+    tvalue(bool);         // Bool
+    tvalue(lua_integer);  // Int
+    tvalue(lua_number);   // Float
+    tvalue(object_store_ref);   // Obj (table, function)
+
+    tvalue(uint8_t tagt);  // String
+
+    ~tvalue();
+
+    void set_object(size_t position, lua_object &obj);
+    bool operator==(const tvalue &) const;
+  };
+
   struct lua_table {
     struct node {
       // Pointer to the global table store
-      size_t key_ref;
+      tvalue key_ref;
       // Pointer to the global table store
-      size_t value_ref;
+      tvalue value_ref;
     };
     small_vector<node, 16> entries;
-
-    // template<typename STORAGE>
-    // void set(STORAGE store, tvalue *key, tvalue *value) {
-      
-    // }
   };
 
   /**
@@ -89,40 +130,21 @@ namespace robotlua {
    * A value may hold an object (or rather, a reference to an object), but an object is not a value.
    */
   struct lua_object {
+    bool is_free;
     uint8_t tag_type;
     simple_variant<lua_table, lua_closure> data;
+
+    lua_object();
+
+    lua_table &new_table();
+    lua_lclosure &new_lclosure();
+    lua_native_closure &new_native_closure(bool light=false);
+
+    void use();
+    void unuse();
+
+   private:
     size_t refcount;
-
-    lua_object(uint8_t tagt);
-  };
-
-  using object_store = small_vector<simple_variant<lua_object>, 32>;
-
-  struct tvalue {
-    using string_vec = small_vector<char, 32>;
-
-    uint8_t tag_type;
-    /**
-     * no type: Nil
-     * bool: Boolean
-     * lua_number: Number (float)
-     * lua_integer: Number (integer)
-     * string_vec: String
-     * size_t: Index in object store
-     */
-    simple_variant<bool, lua_number, lua_integer, string_vec, size_t> data;
-
-    tvalue();             // Nil
-    tvalue(bool);         // Bool
-    tvalue(lua_integer);  // Int
-    tvalue(lua_number);   // Float
-
-    tvalue(uint8_t tagt);  // String, object
-
-    ~tvalue();
-
-    void set_object(size_t position, lua_object &obj);
-    bool operator==(const tvalue &) const;
   };
 
 }  // namespace robotlua
