@@ -8,11 +8,9 @@
 
 namespace grpl {
 namespace robotlua {
-  // We store Instructions and Integers as the value of size_t - 32 on 32-bit platforms and 64 on 64-bit
-  // platforms.
-  typedef size_t lua_instruction;
-  typedef int    lua_integer;
-  typedef double lua_number;  // TODO: Add define arg for float?
+  using lua_instruction = size_t;
+  using lua_integer     = int;
+  using lua_number      = double;
 
   enum class tag {
     NIL             = 0,
@@ -97,6 +95,8 @@ namespace robotlua {
 
     lua_object(uint8_t tagt);
   };
+
+  using object_store = small_vector<simple_variant<lua_object>, 32>;
 
   struct tvalue {
     using string_vec = small_vector<char, 32>;

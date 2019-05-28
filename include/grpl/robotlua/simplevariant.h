@@ -134,7 +134,7 @@ namespace robotlua {
 
     template <typename U, typename = typename std::enable_if<type_in<U, T...>::value>::type>
     U &get() const {
-      return *reinterpret_cast<U *>(&_data_raw[0]);
+      return *reinterpret_cast<U *>((char *)&_data_raw[0]);
     }
 
     template <typename U>
