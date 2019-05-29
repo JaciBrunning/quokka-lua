@@ -16,6 +16,9 @@ class small_vector_base {
     small_vector_base *vec;
     size_t idx;
 
+    continuous_reference() {}
+    continuous_reference(small_vector_base *v, size_t i) : vec(v), idx(i) {}
+
     T *operator*() const {
       return &vec->operator[](idx);
     }
@@ -95,6 +98,14 @@ class small_vector : public small_vector_base<T> {
     return emplace(size(), std::forward<Args>(args)...);
   }
 
+  void chop(size_t top) {
+    for (size_t i = top; i < size(); i++) {
+      (&active_buffer()[i])->~T();
+    }
+    if (top < _size)
+      _size = top;
+  }
+
   size_t size() const override {
     return _size;
   }
@@ -119,7 +130,7 @@ class small_vector : public small_vector_base<T> {
     if (next_size > STACK_SIZE && next_size > _alloced_size) {
       T* new_buf = (T*)malloc(sizeof(T) * next_size);
       for (size_t i = 0; i < _size; i++)
-        new_buf[i] = active_buffer()[i];
+        new(&new_buf[i]) T(active_buffer()[i]);
       
       clear_elements();
 

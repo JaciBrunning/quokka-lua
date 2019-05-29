@@ -94,10 +94,13 @@ iAx     |                         Ax(26)                  | |   Op(6) |
 */
 namespace opcode_util {
 
-struct refreg {
-  bool is_const;
-  uint8_t val;
-};
+inline bool is_const(int reg) {
+  return (reg & 0x100) > 0;
+}
+
+inline uint8_t val(int reg) {
+  return (uint8_t)(reg & 0xFF);
+}
 
 inline opcode get_opcode(lua_instruction instruction) {
   return (opcode)(instruction & 0b111111);
@@ -107,14 +110,12 @@ inline uint8_t get_A(lua_instruction instruction) {
   return (instruction >> 6) & 0xFF;
 }
 
-inline refreg get_B(lua_instruction instruction) {
-  uint16_t b = (instruction >> (6 + 8 + 1)) & 0x1FF;
-  return { (b & 0x100) > 0, (uint8_t)(b & 0xFF) };
+inline unsigned int get_B(lua_instruction instruction) {
+  return (instruction >> (6 + 8 + 1)) & 0x1FF;
 }
 
-inline refreg get_C(lua_instruction instruction) {
-  uint16_t c = (instruction >> (6 + 8 + 1 + 8)) & 0x1FF;
-  return { (c & 0x100) > 0, (uint8_t)(c & 0xFF) };
+inline unsigned int get_C(lua_instruction instruction) {
+  return (instruction >> (6 + 8 + 1 + 8)) & 0x1FF;
 }
 
 inline uint32_t get_Bx(lua_instruction instruction) {

@@ -7,51 +7,14 @@
 
 namespace grpl {
 namespace robotlua {
-  /**
-   * The Upval is a construct of Lua that allows for values to exist oustide of their
-   * regular scope. Consider the case of the anonymous function:
-   * 
-   * function createFunc()
-   *  local i = 0
-   *  local anon = function()
-   *    i = i + 1
-   *    return i
-   *  end
-   *  anon()
-   *  return anon
-   * end
-   * 
-   * In this case, "i" would usually go out of scope upon the return of createFunc(), 
-   * but since it is being used by the anonymous function, we can't allow that to happen.
-   * "i" is, in a sense, made global until all instances of the anonymous function are
-   * not used anymore. "i" is an upval.
-   * 
-   * Note that "i", while still an upval, exists in two states at different times during 
-   * execution. Before the local "i" goes out of scope (i.e. createFunc returns), the "i"
-   * value is shared between createFunc and the anonymous function, hence it is on the stack.
-   * In this state, "i" is referred to as an "open upval".
-   * 
-   * When createFunc returns, the stack entry for createFunc and its variables is popped. In 
-   * this case, "i" would go out of scope and would no longer be accessible to the anonymous 
-   * function. To solve this, each time a function is returned, its upvals (if still in use)
-   * are moved to a global upval table, outside of the stack entirely. In this case, "i" is 
-   * classified as a "closed upval" (it holds its own data, instead of pointing to a value
-   * already on the stack).
-   */
-  struct lua_upval {
-    /**
-     * size_t: Stack offset of upval when open
-     * tvalue: Actual value of the upval when closed
-     */
-    simple_variant<size_t, tvalue> value;
-    size_t refcount;
-  };
+
+  #define CALL_STATUS_LUA (1 << 1)
+  #define CALL_STATUS_FRESH (1 << 3)
+  #define CALL_STATUS_TAIL (1 << 5)
 
   struct lua_call {
     // Index of the function in the stack
     size_t func_idx;
-    // Index of the top of this function in the stack
-    size_t top;
     // Function type specific info
     union {
       struct {
@@ -61,7 +24,8 @@ namespace robotlua {
       struct { } native;
     } info;
     // How many results (return vals) from this function?
-    int numresults;
+    int numresults = 0; // TODO: Check negatives
+    unsigned callstatus = 0;
   };
 
   // Our equivilent of lua_state
@@ -69,8 +33,27 @@ namespace robotlua {
    public:
     vm();
     void load(bytecode_chunk &);
+
     object_store_ref alloc_object();
-   private:
+    upval_ref alloc_upval();
+
+    /**
+     * Call a function that has its closure on the register stack already
+     */
+    void call(size_t nargs, int nreturn);
+    void call_at(size_t func_stack_idx, int nresults);
+  //  private:
+    using call_ref = small_vector_base<lua_call>::continuous_reference;
+    using reg_ref = small_vector_base<tvalue>::continuous_reference;
+
+    // Return true if C function
+    bool precall(size_t func_stack_idx, int nreturn);
+    void execute();
+    // Return false if multi results (variable number)
+    bool postcall(size_t first_result_idx, int nreturn);
+
+    void close_upvals(size_t level);
+
     /**
      * Find the next available 'slot' in a vector that contains single-element
      * variants.
@@ -89,12 +72,10 @@ namespace robotlua {
     }
 
     small_vector<tvalue, 48> _registers;
+    small_vector<lua_call, 16> _callinfo;
     // Upval storage - used for variables that transcend the normal scope. 
     // e.g. local variables in ownership by an anonymous function
-    small_vector<simple_variant<lua_upval>, 16> _upvals;
-    // Root Prototype storage - used to store the 'root prototype' (function
-    // definition) of loaded files. Referenced by lua_lclosure
-    small_vector<simple_variant<bytecode_prototype>, 4> _rootprotos;
+    small_vector<lua_upval, 16> _upvals;
     // Store for objects
     small_vector<lua_object, 16> _objects;
 

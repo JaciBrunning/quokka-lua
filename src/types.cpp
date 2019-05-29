@@ -4,24 +4,60 @@
 
 using namespace grpl::robotlua;
 
+object_store_ref::object_store_ref(small_vector_base<lua_object> *v, size_t id) {
+  vec = v;
+  idx = id;
+  get()->use();
+}
+
+object_store_ref::~object_store_ref() {
+  get()->unuse();
+}
+
+upval_ref::upval_ref(small_vector_base<lua_upval> *v, size_t id) {
+  vec = v;
+  idx = id;
+  get()->use();
+}
+
+upval_ref::~upval_ref() {
+  get()->unuse();
+}
+
 lua_object::lua_object() : tag_type(construct_tag_type(tag::NIL)) {
   is_free = true;
   refcount = 0;
 }
 
-lua_table &lua_object::new_table() {
+lua_table &lua_object::table() {
+  if (data.is<lua_table>())
+    return data.get<lua_table>();
   tag_type = construct_tag_type(tag::TABLE);
   return data.emplace<lua_table>();
 }
 
-lua_lclosure &lua_object::new_lclosure() {
-  tag_type = construct_tag_type(tag::FUNC, variant::FUNC_LUA);
-  return data.emplace<lua_closure>().impl.emplace<lua_lclosure>();
+lua_closure &lua_object::closure() {
+  if (data.is<lua_closure>())
+    return data.get<lua_closure>();
+  return data.emplace<lua_closure>();
 }
 
-lua_native_closure &lua_object::new_native_closure(bool light) {
+lua_lclosure &lua_object::lclosure() {
+  lua_closure &parent = closure();
+  if (parent.impl.is<lua_lclosure>())
+    return parent.impl.get<lua_lclosure>();
+
+  tag_type = construct_tag_type(tag::FUNC, variant::FUNC_LUA);
+  return parent.impl.emplace<lua_lclosure>();
+}
+
+lua_native_closure &lua_object::native_closure(bool light) {
+  lua_closure &parent = closure();
+  if (parent.impl.is<lua_native_closure>())
+    return parent.impl.get<lua_native_closure>();
+
   tag_type = construct_tag_type(tag::FUNC, light ? variant::FUNC_LIGHT_C : variant::FUNC_C);
-  return data.emplace<lua_closure>().impl.emplace<lua_native_closure>();
+  return parent.impl.emplace<lua_native_closure>();
 }
 
 void lua_object::use() {
@@ -33,8 +69,7 @@ void lua_object::unuse() {
   refcount--;
   if (refcount == 0) {
     is_free = true;
-    if (!data.is_assigned())
-      data.unassign();
+    data.unassign();
   }
 }
 
@@ -71,6 +106,18 @@ tvalue::~tvalue() {
   data.~simple_variant();
 }
 
+bool tvalue::is_nil() {
+  return get_tag_from_tag_type(tag_type) == tag::NIL;
+}
+
+bool tvalue::is_falsey() {
+  return is_nil() || (data.is<bool>() && !data.get<bool>());
+}
+
+object_store_ref tvalue::obj() {
+  return data.get<object_store_ref>();
+}
+
 bool tvalue::operator==(const tvalue &other) const {
   if (tag_type != other.tag_type) return false;
   // nil has no data
@@ -95,4 +142,41 @@ bool tvalue::operator==(const tvalue &other) const {
   }
 
   return true;
+}
+
+tvalue lua_table::get(const tvalue &key) const {
+  for (size_t i = 0; i < entries.size(); i++) {
+    if (entries[i].key == key)
+      return entries[i].value;
+  }
+  return tvalue();  // nil
+}
+
+void lua_table::set(const tvalue &k, const tvalue &v) {
+  for (size_t i = 0; i < entries.size(); i++) {
+    if (entries[i].key == k) {
+      entries[i].value = v;
+      return;
+    }
+  }
+
+  entries.emplace_back(k, v);
+}
+
+lua_upval::lua_upval() {
+  refcount = 0;
+  is_free = true;
+}
+
+void lua_upval::use() {
+  refcount++;
+  is_free = false;
+}
+
+void lua_upval::unuse() {
+  refcount--;
+  if (refcount == 0) {
+    is_free = true;
+    value.unassign();
+  }
 }
