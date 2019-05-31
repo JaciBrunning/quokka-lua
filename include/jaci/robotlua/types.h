@@ -6,7 +6,7 @@
 #include "smallvector.h"
 #include "simplevariant.h"
 
-namespace grpl {
+namespace jaci {
 namespace robotlua {
   using lua_instruction = size_t;
   using lua_integer     = int;
@@ -243,4 +243,4 @@ namespace robotlua {
     }
   }
 }  // namespace robotlua
-}  // namespace grpl
+}  // namespace jaci

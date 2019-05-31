@@ -4,7 +4,7 @@
 #include <utility>
 #include <stdlib.h>
 
-namespace grpl {
+namespace jaci {
 namespace robotlua {
 
 template <typename T>
@@ -160,4 +160,4 @@ class small_vector : public small_vector_base<T> {
   size_t _alloced_size = STACK_SIZE;
 };
 } // namespace robotlua
-} // namespace grpl
+} // namespace jaci

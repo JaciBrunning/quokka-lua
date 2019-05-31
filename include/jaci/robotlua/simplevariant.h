@@ -4,7 +4,7 @@
 #include <new>
 #include <typeinfo>
 
-namespace grpl {
+namespace jaci {
 namespace robotlua {
 
   // Simple implementation of std::variant, using C++ compile-time magic
@@ -145,4 +145,4 @@ namespace robotlua {
     bool is_assigned() const { return (_type_id != typeid(void).hash_code()); }
   };
 }  // namespace robotlua
-}  // namespace grpl
+}  // namespace jaci

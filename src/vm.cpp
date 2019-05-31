@@ -1,9 +1,9 @@
-#include "grpl/robotlua/vm.h"
-#include "grpl/robotlua/opcodes.h"
+#include "jaci/robotlua/vm.h"
+#include "jaci/robotlua/opcodes.h"
 
 #include <math.h>
 
-using namespace grpl::robotlua;
+using namespace jaci::robotlua;
 
 vm::vm() {
   // Load distinguished env.

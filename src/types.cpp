@@ -1,8 +1,8 @@
-#include "grpl/robotlua/types.h"
+#include "jaci/robotlua/types.h"
 
 #include <new>
 
-using namespace grpl::robotlua;
+using namespace jaci::robotlua;
 
 object_store_ref::object_store_ref(small_vector_base<lua_object> *v, size_t id) {
   vec = v;

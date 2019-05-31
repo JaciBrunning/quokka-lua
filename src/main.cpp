@@ -1,6 +1,6 @@
-#include "grpl/robotlua.h"
+#include "jaci/robotlua.h"
 
-using namespace grpl::robotlua;
+using namespace jaci::robotlua;
 
 #include <fstream>
 #include <iostream>

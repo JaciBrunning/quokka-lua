@@ -7,7 +7,7 @@
 #include "smallvector.h"
 #include "types.h"
 
-namespace grpl {
+namespace jaci {
 namespace robotlua {
 
 struct bytecode_architecture {
@@ -117,4 +117,4 @@ class bytecode_writer {
 };
 
 } // namespace robotlua
-} // namespace grpl
+} // namespace jaci

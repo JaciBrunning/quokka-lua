@@ -2,7 +2,7 @@
 
 #include "types.h"
 
-namespace grpl {
+namespace jaci {
 namespace robotlua {
 // Directly taken from lopcodes.h in the Lua source
 enum class opmode { iABC = 0, iABx, iAsBx, iAx };
@@ -135,4 +135,4 @@ inline uint32_t get_Ax(lua_instruction instruction) {
 }
 
 } // namespace robotlua
-} // namespace grpl
+} // namespace jaci

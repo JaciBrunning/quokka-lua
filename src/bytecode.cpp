@@ -1,6 +1,6 @@
-#include "grpl/robotlua/bytecode.h"
+#include "jaci/robotlua/bytecode.h"
 
-using namespace grpl::robotlua;
+using namespace jaci::robotlua;
 
 #if defined(__APPLE__)
 #include <libkern/OSByteOrder.h>

@@ -5,7 +5,7 @@
 
 #include <functional>
 
-namespace grpl {
+namespace jaci {
 namespace robotlua {
 
   #define CALL_STATUS_LUA (1 << 1)
