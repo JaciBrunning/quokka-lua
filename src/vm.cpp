@@ -70,6 +70,14 @@ tvalue &vm::argument(int id) {
   return _registers[_callinfo.last().func_idx + id + 1];
 }
 
+int vm::num_params() {
+  return _registers.size() - (_callinfo.last().func_idx + 1);
+}
+
+void vm::push(const tvalue &v) {
+  _registers.emplace_back(v);
+}
+
 lua_table &vm::env() {
   return _distinguished_env.data.get<object_store_ref>().get()->table();
 }
@@ -82,10 +90,6 @@ object_store_ref vm::alloc_native_function(lua_native_closure::func_t f) {
 
 void vm::define_native_function(const tvalue &key, lua_native_closure::func_t f) {
   env().set(key, alloc_native_function(f));
-}
-
-int vm::num_params() {
-  return _registers.size() - (_callinfo.last().func_idx + 1);
 }
 
 // PRIVATE //
@@ -152,7 +156,7 @@ bool vm::precall(size_t func_stack_idx, int nreturn) {
 
 #define RL_VM_PC(ci_ref) ((*ci_ref)->info.lua.pc)
 // Obtain an upvalue
-#define RL_VM_UPV(i, target) { \
+#define RL_VM_UPV(i, target, cl_ref) { \
   lua_upval *upv_ = (*cl_ref)->lclosure().upval_refs[i].get(); \
   target = upv_->value.is<size_t>() ? &_registers[upv_->value.get<size_t>()] : &upv_->value.get<tvalue>(); }
 // Decode a B or C register, using a constant value or stack value where appropriate
@@ -185,12 +189,12 @@ void vm::execute() {
         break;
       case opcode::OP_LOADK:
         // Move K(Bx) to R(A)
-        _registers[ra] = proto->constants[bx];
+        _registers.emplace(ra, proto->constants[bx]);
         break;
       case opcode::OP_LOADKX:
         // Move K(extra arg) to R(A)
         // Next instruction is extra arg, so we have to advance the instruction counter
-        _registers[ra] = proto->constants[opcode_util::get_Ax(*(RL_VM_PC(ci_ref)++))];
+        _registers.emplace(ra, proto->constants[opcode_util::get_Ax(*(RL_VM_PC(ci_ref)++))]);
         break;
       case opcode::OP_LOADBOOL:
         // Load (Bool)B into R(A), if C, pc++ (skip next instruction)
@@ -207,14 +211,14 @@ void vm::execute() {
       case opcode::OP_GETUPVAL: {
         // R(A) = Upval[B]
         tvalue *tv;
-        RL_VM_UPV(arg_b, tv);
+        RL_VM_UPV(arg_b, tv, cl_ref);
         _registers.emplace(ra, *tv);
         break;
       }
       case opcode::OP_GETTABUP: {
         // R(A) = Upval[B][RK(C)]
         tvalue *tuv;
-        RL_VM_UPV(arg_b, tuv);
+        RL_VM_UPV(arg_b, tuv, cl_ref);
         lua_table &table = tuv->obj().get()->table();
         // _registers[ra] = table.get(RL_VM_RK(arg_c));
         _registers.emplace(ra, table.get(RL_VM_RK(arg_c)));
@@ -230,7 +234,7 @@ void vm::execute() {
       case opcode::OP_SETTABUP: {
         // Upval[A][RK(B)] = RK(C)
         tvalue *tupv;
-        RL_VM_UPV(arg_a, tupv);
+        RL_VM_UPV(arg_a, tupv, cl_ref);
         tupv->obj().get()->table().set(RL_VM_RK(arg_b), RL_VM_RK(arg_c));
         break;
       }
@@ -439,7 +443,8 @@ void vm::execute() {
         break;
       }
       case opcode::OP_CONCAT:
-        // TODO:
+        // R(A) = R(B) .. .. R(C)
+        // TODO: 
         break;
       case opcode::OP_JMP: {
         // pc += sBx; if (A) close all upvals >= R(A - 1)
@@ -495,7 +500,7 @@ void vm::execute() {
           // Set new top? This should be done already.
         }
         if (precall(ra, nresults)) {
-          // C Func
+          // C Func, already called
         } else {
           // Lua Func
           goto new_call;
@@ -503,6 +508,13 @@ void vm::execute() {
         break;
       }
       case opcode::OP_TAILCALL:
+        // return R(A)(R(A+1) ... R(A+B-1))
+        // -1 = multiret
+        if (!precall(ra, -1)) {
+          // Lua function
+        } else {
+          // TODO:
+        }
         break;
       case opcode::OP_RETURN: {
         if ((*cl_ref)->lclosure().proto->num_protos > 0) {
@@ -513,22 +525,63 @@ void vm::execute() {
         if ((*ci_ref)->callstatus & CALL_STATUS_FRESH)
           return;   // Invoked externally, can just return
         else {
-          // TODO: I don't think I need to adjust the top
           goto new_call;
         }
       }
-      case opcode::OP_FORLOOP:
+      case opcode::OP_FORLOOP: {
+        // R(A) += R(A+2); if R(A) <?= R(A+1) then { pc += sBx; R(A+3) = R(A) }
+        if (_registers[ra].data.is<lua_integer>()) {
+          // integer loop
+          lua_integer step = _registers[ra + 2].data.get<lua_integer>();
+          lua_integer idx = _registers[ra].data.get<lua_integer>() + step;
+          lua_integer limit = _registers[ra + 1].data.get<lua_integer>();
+          if ( (step > 0) ? (idx <= limit) : (limit <= idx) ) {
+            // Jump pc by sBx
+            RL_VM_PC(ci_ref) += opcode_util::get_sBx(instruction);
+            _registers.emplace(ra, tvalue(idx));
+            _registers.emplace(ra + 3, _registers[ra]);
+          }
+        } else {
+          // floating point loop
+          lua_number step = _registers[ra + 2].data.get<lua_number>();
+          lua_number idx = _registers[ra].data.get<lua_number>() + step;
+          lua_number limit = _registers[ra + 1].data.get<lua_number>();
+          if ( (step > 0) ? (idx <= limit) : (limit <= idx) ) {
+            // Jump pc by sBx
+            RL_VM_PC(ci_ref) += opcode_util::get_sBx(instruction);
+            _registers.emplace(ra, tvalue(idx));
+            _registers.emplace(ra + 3, _registers[ra]);
+          }
+        }
         break;
-      case opcode::OP_FORPREP:
+      }
+      case opcode::OP_FORPREP: {
+        // R(A) -= R(A+2); pc += sBx
+        tvalue &init = _registers[ra];
+        tvalue &limit = _registers[ra + 1];
+        tvalue &step = _registers[ra + 2];
+
+        // TODO:
         break;
+      }
       case opcode::OP_TFORCALL:
         break;
       case opcode::OP_TFORLOOP:
         break;
       case opcode::OP_SETLIST:
         break;
-      case opcode::OP_CLOSURE:
+      case opcode::OP_CLOSURE: {
+        // R(A) = closure(KPROTO[Bx])
+        lua_lclosure &this_closure = (*cl_ref)->lclosure();
+        bytecode_prototype &proto = *this_closure.proto->protos[bx];
+        object_store_ref cache = lclosure_cache(proto, base, cl_ref);
+        if (cache.is_valid()) {
+          _registers.emplace(ra, cache);
+        } else {
+          _registers.emplace(ra, lclosure_new(proto, base, cl_ref));
+        }
         break;
+      }
       case opcode::OP_VARARG:
         break;
       default:
@@ -586,6 +639,7 @@ bool vm::postcall(size_t first_result_idx, int nreturn) {
 void vm::close_upvals(size_t level) {
   for (size_t i = 0; i < _upvals.size(); i++) {
     lua_upval &uv = _upvals[i];
+    // Ensure upval is open
     if (!uv.is_free && uv.value.is<size_t>()) {
       size_t stack_idx = uv.value.get<size_t>();
       if (level <= stack_idx) {
@@ -594,4 +648,70 @@ void vm::close_upvals(size_t level) {
       }
     }
   }
+}
+
+object_store_ref vm::lclosure_cache(bytecode_prototype &proto, size_t base, object_store_ref parent_cl) {
+  object_store_ref cl_ref = proto.closure_cache;
+  if (cl_ref.is_valid()) {
+    int num_upval = proto.num_upvalues;
+    for (int i = 0; i < num_upval; i++) {
+      bytecode_upvalue v = proto.upvalues[i];
+      tvalue tval_cache, tval_target;
+      // Get the actual upvalue from the closure cache
+      RL_VM_UPV(i, tval_cache, cl_ref);
+      // Get the target tval (either in the stack, or inherited from parent)
+      if (v.instack) {
+        tval_target = _registers[base + v.idx];
+      } else {
+        RL_VM_UPV(v.idx, tval_target, parent_cl);
+      }
+
+      if (!(tval_cache == tval_target))
+        return object_store_ref(); // upvalues don't match
+    }
+  }
+  return cl_ref;
+}
+
+object_store_ref vm::lclosure_new(bytecode_prototype &proto, size_t base, object_store_ref parent_cl) {
+  int num_upval = proto.num_upvalues;
+  object_store_ref new_closure = alloc_object();
+  lua_lclosure &ncl = (*new_closure)->lclosure();
+  ncl.proto = &proto;
+  
+  // Assign each upval
+  for (int i = 0; i < num_upval; i++) {
+    bytecode_upvalue v = proto.upvalues[i];
+    if (v.instack) {
+      // Find upval
+      bool upval_found = false;
+      size_t level = base + v.idx;
+      for (size_t i = 0; i < _upvals.size() && !upval_found; i++) {
+        lua_upval &uv = _upvals[i];
+        // Ensure upval is open
+        if (!uv.is_free && uv.value.is<size_t>()) {
+          size_t stack_idx = uv.value.get<size_t>();
+          if (stack_idx == level) {
+            ncl.upval_refs.emplace(i, upval_ref(&_upvals, i));
+            upval_found = true;
+          }
+        }
+      }
+
+      // Upval could not be found - make a new one
+      if (!upval_found) {
+        upval_ref uvr = alloc_upval();
+        (*uvr)->value.emplace<size_t>(level);
+        ncl.upval_refs.emplace(i, uvr);
+      }
+    } else {
+      // Use upval from parent function
+      ncl.upval_refs.emplace(i, (*parent_cl)->lclosure().upval_refs[v.idx]);
+    }
+  }
+
+  // Save the closure in a cache in the prototype
+  proto.closure_cache = new_closure;
+
+  return new_closure;
 }

@@ -1,3 +1,4 @@
-a = 12
-b = 32
-print(a, b)
+test_func = function(a)
+  test(a)
+end
+test_func(888)

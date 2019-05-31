@@ -54,7 +54,7 @@ struct bytecode_prototype {
   small_vector<lua_instruction, 32> instructions;
   /* Constants */
   int num_constants;
-  small_vector<tvalue, 32> constants;
+  small_vector<tvalue, 16> constants;
   /* Upvalues */
   int num_upvalues;
   small_vector<bytecode_upvalue, 4> upvalues;
@@ -64,6 +64,9 @@ struct bytecode_prototype {
   int num_protos;
   small_vector<bytecode_prototype *, 16> protos;    // TODO: memory leak here - functions are alloc'ed in heap.
   // Debugging information is ignored, but still must be parsed.
+  
+  /* RUNTIME INFO */
+  object_store_ref closure_cache;
 };
 
 struct bytecode_chunk {

@@ -16,7 +16,7 @@ class small_vector_base {
     small_vector_base *vec;
     size_t idx;
 
-    continuous_reference() {}
+    continuous_reference() : vec(nullptr) {}
     continuous_reference(small_vector_base *v, size_t i) : vec(v), idx(i) {}
 
     T *operator*() const {
@@ -29,6 +29,10 @@ class small_vector_base {
 
     bool operator==(const continuous_reference &other) const {
       return (vec == other.vec) && (idx == other.idx);
+    }
+
+    bool is_valid() {
+      return vec != nullptr;
     }
   };
 

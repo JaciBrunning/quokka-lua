@@ -35,8 +35,7 @@ namespace robotlua {
     STR_LONG     = 1,  // NOTE: RobotLua does not differentiate between Long and Short strings.
     /* Function */
     FUNC_LUA     = 0,
-    FUNC_LIGHT_C = 1,
-    FUNC_C       = 2
+    FUNC_C       = 2   // NOTE: In RobotLua, every C function is a light C function.
   };
 
   inline uint8_t construct_tag_type(tag t, variant v = variant::NONE) {
@@ -67,17 +66,30 @@ namespace robotlua {
   struct store_refcountable : public small_vector_base<T>::continuous_reference {
     using basevector_t = small_vector_base<T>;
 
-    store_refcountable() = delete;
+    store_refcountable() : basevector_t::continuous_reference(nullptr, 0) {}
 
     store_refcountable(basevector_t *v, size_t id) : basevector_t::continuous_reference(v, id) {
-      basevector_t::continuous_reference::get()->use();
+      if (basevector_t::continuous_reference::is_valid())
+        basevector_t::continuous_reference::get()->use();
     }
 
     store_refcountable(const store_refcountable &other) : store_refcountable(other.vec, other.idx) {}
     store_refcountable(store_refcountable &&other) : store_refcountable(other.vec, other.idx) {}
 
+    store_refcountable &operator=(const store_refcountable &other) {
+      if (basevector_t::continuous_reference::is_valid())
+        basevector_t::continuous_reference::get()->unuse();
+      
+      this->vec = other.vec;
+      this->idx = other.idx;
+
+      if (basevector_t::continuous_reference::is_valid())
+        basevector_t::continuous_reference::get()->use();
+    }
+
     ~store_refcountable() {
-      basevector_t::continuous_reference::get()->unuse();
+      if (basevector_t::continuous_reference::is_valid())
+        basevector_t::continuous_reference::get()->unuse();
     }
   };
 
@@ -87,7 +99,7 @@ namespace robotlua {
   // Note: fwd declaration of bytecode_prototype in bytecode.h
   struct bytecode_prototype;
 
-  // Note: fwd declaration of vm in vm.h
+  // Note: fwd declaration of vm in vm.h (needed by lua_native_closure funcdec)
   class vm;
 
   struct lua_lclosure {
@@ -166,7 +178,7 @@ namespace robotlua {
     lua_table &table();
     lua_closure &closure();
     lua_lclosure &lclosure();
-    lua_native_closure &native_closure(bool light=false);
+    lua_native_closure &native_closure();
 
     void on_refcount_zero() override;
   };

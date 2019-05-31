@@ -46,11 +46,12 @@ namespace robotlua {
     // To be called from within a called function
     // Gets a local variable passed to a function. ID starts from 1
     tvalue &argument(int id);
+    int num_params();
+    void push(const tvalue &v);
 
     lua_table &env();
     object_store_ref alloc_native_function(lua_native_closure::func_t f);
     void define_native_function(const tvalue &key, lua_native_closure::func_t f);
-    int num_params();
     
   //  private:
     using call_ref = small_vector_base<lua_call>::continuous_reference;
@@ -63,6 +64,8 @@ namespace robotlua {
     bool postcall(size_t first_result_idx, int nreturn);
 
     void close_upvals(size_t level);
+    object_store_ref lclosure_cache(bytecode_prototype &proto, size_t func_base, object_store_ref parent_cl);
+    object_store_ref lclosure_new(bytecode_prototype &proto, size_t func_base, object_store_ref parent_cl);
 
     /**
      * Find the next available 'slot' in a vector that contains single-element

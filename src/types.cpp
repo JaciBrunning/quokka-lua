@@ -41,12 +41,12 @@ lua_lclosure &lua_object::lclosure() {
   return parent.impl.emplace<lua_lclosure>();
 }
 
-lua_native_closure &lua_object::native_closure(bool light) {
+lua_native_closure &lua_object::native_closure() {
   lua_closure &parent = closure();
   if (parent.impl.is<lua_native_closure>())
     return parent.impl.get<lua_native_closure>();
 
-  tag_type = construct_tag_type(tag::FUNC, light ? variant::FUNC_LIGHT_C : variant::FUNC_C);
+  tag_type = construct_tag_type(tag::FUNC, variant::FUNC_C);
   return parent.impl.emplace<lua_native_closure>();
 }
 
