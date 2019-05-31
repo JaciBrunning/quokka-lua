@@ -4,30 +4,20 @@
 
 using namespace jaci::robotlua;
 
-object_store_ref::object_store_ref(small_vector_base<lua_object> *v, size_t id) {
-  vec = v;
-  idx = id;
-  get()->use();
+void refcountable::use() {
+  refcount++;
+  is_free = false;
 }
 
-object_store_ref::~object_store_ref() {
-  get()->unuse();
+void refcountable::unuse() {
+  refcount--;
+  if (refcount == 0) {
+    is_free = true;
+    on_refcount_zero();
+  }
 }
 
-upval_ref::upval_ref(small_vector_base<lua_upval> *v, size_t id) {
-  vec = v;
-  idx = id;
-  get()->use();
-}
-
-upval_ref::~upval_ref() {
-  get()->unuse();
-}
-
-lua_object::lua_object() : tag_type(construct_tag_type(tag::NIL)) {
-  is_free = true;
-  refcount = 0;
-}
+lua_object::lua_object() : tag_type(construct_tag_type(tag::NIL)) { }
 
 lua_table &lua_object::table() {
   if (data.is<lua_table>())
@@ -60,17 +50,8 @@ lua_native_closure &lua_object::native_closure(bool light) {
   return parent.impl.emplace<lua_native_closure>();
 }
 
-void lua_object::use() {
-  refcount++;
-  is_free = false;
-}
-
-void lua_object::unuse() {
-  refcount--;
-  if (refcount == 0) {
-    is_free = true;
-    data.unassign();
-  }
+void lua_object::on_refcount_zero() {
+  data.unassign();
 }
 
 tvalue::tvalue() : tag_type(construct_tag_type(tag::NIL)) {}
@@ -102,8 +83,8 @@ tvalue::tvalue(uint8_t tagt) : tag_type(tagt) {
   }
 }
 
-tvalue::~tvalue() {
-  data.~simple_variant();
+tvalue::tvalue(const char *s) : tag_type(construct_tag_type(tag::STRING)) {
+  data.emplace<string_vec>(s);
 }
 
 bool tvalue::is_nil() {
@@ -163,20 +144,6 @@ void lua_table::set(const tvalue &k, const tvalue &v) {
   entries.emplace_back(k, v);
 }
 
-lua_upval::lua_upval() {
-  refcount = 0;
-  is_free = true;
-}
-
-void lua_upval::use() {
-  refcount++;
-  is_free = false;
-}
-
-void lua_upval::unuse() {
-  refcount--;
-  if (refcount == 0) {
-    is_free = true;
-    value.unassign();
-  }
+void lua_upval::on_refcount_zero() {
+  value.unassign();
 }

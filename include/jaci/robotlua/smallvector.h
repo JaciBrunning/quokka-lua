@@ -71,6 +71,10 @@ class small_vector : public small_vector_base<T> {
     return active_buffer()[pos];
   }
 
+  T& last() const {
+    return active_buffer()[size() - 1];
+  }
+
   void reserve(size_t size) override {
     if (size > _size) {
       grow(size);

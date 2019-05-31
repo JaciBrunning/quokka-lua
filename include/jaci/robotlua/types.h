@@ -4,6 +4,7 @@
 #include <functional>
 
 #include "smallvector.h"
+#include "smallstring.h"
 #include "simplevariant.h"
 
 namespace jaci {
@@ -51,28 +52,38 @@ namespace robotlua {
   struct lua_upval;
 
   // TODO: Generify these
+  class refcountable {
+   public:
+    bool is_free = true;
+    int refcount = 0;
+
+    void use();
+    void unuse();
+
+    virtual void on_refcount_zero() {};
+  };
 
   // Store object reference with refcount.
-  struct object_store_ref : small_vector_base<lua_object>::continuous_reference {
-    object_store_ref() = delete;
+  template<typename T>
+  struct store_refcountable : public small_vector_base<T>::continuous_reference {
+    using basevector_t = small_vector_base<T>;
 
-    object_store_ref(small_vector_base<lua_object> *v, size_t id);
-    object_store_ref(const object_store_ref &other) : object_store_ref(other.vec, other.idx) { }
-    object_store_ref(object_store_ref &&other) : object_store_ref(other.vec, other.idx) { }
+    store_refcountable() = delete;
 
-    ~object_store_ref();
+    store_refcountable(basevector_t *v, size_t id) : basevector_t::continuous_reference(v, id) {
+      basevector_t::continuous_reference::get()->use();
+    }
+
+    store_refcountable(const store_refcountable &other) : store_refcountable(other.vec, other.idx) {}
+    store_refcountable(store_refcountable &&other) : store_refcountable(other.vec, other.idx) {}
+
+    ~store_refcountable() {
+      basevector_t::continuous_reference::get()->unuse();
+    }
   };
 
-  // Store upval reference with refcount
-  struct upval_ref : small_vector_base<lua_upval>::continuous_reference {
-    upval_ref() = delete;
-
-    upval_ref(small_vector_base<lua_upval> *v, size_t id);
-    upval_ref(const upval_ref &other) : upval_ref(other.vec, other.idx) { }
-    upval_ref(upval_ref &&other) : upval_ref(other.vec, other.idx) { }
-
-    ~upval_ref();
-  };
+  using object_store_ref = store_refcountable<lua_object>;
+  using upval_ref = store_refcountable<lua_upval>;
 
   // Note: fwd declaration of bytecode_prototype in bytecode.h
   struct bytecode_prototype;
@@ -94,7 +105,7 @@ namespace robotlua {
   };
 
   struct tvalue {
-    using string_vec = small_vector<char, 32>;
+    using string_vec = small_string<32>;
 
     uint8_t tag_type;
     /**
@@ -114,8 +125,7 @@ namespace robotlua {
     tvalue(object_store_ref);   // Obj (table, function)
 
     tvalue(uint8_t tagt);  // String
-
-    ~tvalue();
+    tvalue(const char *);   // Also string
 
     bool is_nil();
     bool is_falsey();
@@ -147,8 +157,7 @@ namespace robotlua {
    * 
    * A value may hold an object (or rather, a reference to an object), but an object is not a value.
    */
-  struct lua_object {
-    bool is_free;
+  struct lua_object : public refcountable {
     uint8_t tag_type;
     simple_variant<lua_table, lua_closure> data;
 
@@ -159,11 +168,7 @@ namespace robotlua {
     lua_lclosure &lclosure();
     lua_native_closure &native_closure(bool light=false);
 
-    void use();
-    void unuse();
-
-   private:
-    size_t refcount;
+    void on_refcount_zero() override;
   };
   
   /**
@@ -197,20 +202,14 @@ namespace robotlua {
    * classified as a "closed upval" (it holds its own data, instead of pointing to a value
    * already on the stack).
    */
-  struct lua_upval {
+  struct lua_upval : public refcountable {
     /**
      * size_t: Stack offset of upval when open
      * tvalue: Actual value of the upval when closed
      */
     simple_variant<size_t, tvalue> value;
-    bool is_free;
 
-    lua_upval();
-
-    void use();
-    void unuse();
-   private:
-    size_t refcount;
+    void on_refcount_zero() override;
   };
 
   namespace conv {
@@ -226,6 +225,12 @@ namespace robotlua {
         return false;
       }
       return false;
+    }
+
+    inline lua_number tonumber2(tvalue &t) {
+      lua_number n = 0;
+      tonumber(t, n);
+      return n;
     }
 
     inline bool tointeger(tvalue &src, lua_integer &out) {

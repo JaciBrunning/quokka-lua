@@ -42,6 +42,10 @@ namespace robotlua {
      */
     void call(size_t nargs, int nreturn);
     void call_at(size_t func_stack_idx, int nresults);
+
+    // To be called from within a called function
+    // Gets a local variable passed to a function. ID starts from 1
+    tvalue &argument(int id);
   //  private:
     using call_ref = small_vector_base<lua_call>::continuous_reference;
     using reg_ref = small_vector_base<tvalue>::continuous_reference;

@@ -4,6 +4,7 @@
 #include <stddef.h>
 #include <istream>
 
+#include "smallstring.h"
 #include "smallvector.h"
 #include "types.h"
 
@@ -42,7 +43,7 @@ struct bytecode_upvalue {
 // Prototype is a description of a Lua function, providing its layout in 
 // bytecode, but without any of its runtime features
 struct bytecode_prototype {
-  small_vector<char, 32> source; // TODO: small_string
+  small_string<16> source;
   int line_defined;
   int last_line_defined;
   uint8_t num_params;

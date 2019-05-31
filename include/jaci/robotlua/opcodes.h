@@ -87,7 +87,7 @@ enum class opcode {
 /*
 Instruction format (5.3):
 
-iABC    |       C(9)    | |       B(9)    | |     A(8)    | |   Op(6) |
+iABC    |       B(9)    | |       C(9)    | |     A(8)    | |   Op(6) |
 iABx    |              Bx(18)             | |     A(8)    | |   Op(6) |
 iAsBx   |             sBx (signed)(18)    | |     A(8)    | |   Op(6) |
 iAx     |                         Ax(26)                  | |   Op(6) |
@@ -111,11 +111,11 @@ inline uint8_t get_A(lua_instruction instruction) {
 }
 
 inline unsigned int get_B(lua_instruction instruction) {
-  return (instruction >> (6 + 8 + 1)) & 0x1FF;
+  return (instruction >> (6 + 8 + 9)) & 0x1FF;
 }
 
 inline unsigned int get_C(lua_instruction instruction) {
-  return (instruction >> (6 + 8 + 1 + 8)) & 0x1FF;
+  return (instruction >> (6 + 8)) & 0x1FF;
 }
 
 inline uint32_t get_Bx(lua_instruction instruction) {

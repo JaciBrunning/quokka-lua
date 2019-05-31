@@ -107,7 +107,8 @@ namespace robotlua {
       // Copy assignment
       _type_id = other._type_id;
       // Copy raw data
-      std::copy(&other._data_raw[0], &other._data_raw[0] + size, &_data_raw[0]);
+      // std::copy(&other._data_raw[0], &other._data_raw[0] + size, &_data_raw[0]);
+      variant_func_t::copy(other._type_id, &other._data_raw[0], &_data_raw[0]);
       return *this;
     }
 
@@ -115,7 +116,8 @@ namespace robotlua {
       // Move assignment
       _type_id = other._type_id;
       // Move raw data
-      std::move(&other._data_raw[0], &other._data_raw[0] + size, &_data_raw[0]);
+      // std::move(&other._data_raw[0], &other._data_raw[0] + size, &_data_raw[0]);
+      variant_func_t::move(other._type_id, &other._data_raw[0], &_data_raw[0]);
       return *this;
     }
 

@@ -10,6 +10,7 @@ vm::vm() {
   _distinguished_env.tag_type = construct_tag_type(tag::TABLE);
   object_store_ref objstore = alloc_object();
   (*objstore)->table();
+  // _distinguished_env = tvalue(objstore);
   _distinguished_env = tvalue(objstore);
 }
 
@@ -64,6 +65,12 @@ void vm::call_at(size_t func_stack_idx, int nreturn) {
   if (!precall(func_stack_idx, nreturn))
     execute();
 }
+
+tvalue &vm::argument(int id) {
+  return _registers[_callinfo.last().func_idx + id + 1];
+}
+
+// PRIVATE //
 
 bool vm::precall(size_t func_stack_idx, int nreturn) {
   // TODO: Meta method, see ldo.c luaD_precall
@@ -131,10 +138,11 @@ bool vm::precall(size_t func_stack_idx, int nreturn) {
   lua_upval *upv_ = (*cl_ref)->lclosure().upval_refs[i].get(); \
   target = upv_->value.is<size_t>() ? &_registers[upv_->value.get<size_t>()] : &upv_->value.get<tvalue>(); }
 // Decode a B or C register, using a constant value or stack value where appropriate
+// Note that lua vm indexes constants from 1, but upvalues from 0 for some reason.
 #define RL_VM_RK(v) (opcode_util::is_const(v) ? proto->constants[opcode_util::val(v)] : _registers[base + opcode_util::val(v)])
 
 void vm::execute() {
-  _callinfo[_callinfo.size() - 1].callstatus |= CALL_STATUS_FRESH;
+  _callinfo.last().callstatus |= CALL_STATUS_FRESH;
  new_call:
   ;
   call_ref ci_ref(&_callinfo, _callinfo.size() - 1);
@@ -190,13 +198,15 @@ void vm::execute() {
         tvalue *tuv;
         RL_VM_UPV(arg_b, tuv);
         lua_table &table = tuv->obj().get()->table();
-        _registers[ra] = table.get(RL_VM_RK(arg_c));
+        // _registers[ra] = table.get(RL_VM_RK(arg_c));
+        _registers.emplace(ra, table.get(RL_VM_RK(arg_c)));
         break;
       }
       case opcode::OP_GETTABLE: {
         // R(A) = R(B)[RK(C)]
         lua_table &table = _registers[base + opcode_util::val(arg_b)].obj().get()->table();
-        _registers[ra] = table.get(RL_VM_RK(arg_c));
+        // _registers[ra] = table.get(RL_VM_RK(arg_c));
+        _registers.emplace(ra, table.get(RL_VM_RK(arg_c)));
         break;
       }
       case opcode::OP_SETTABUP: {
@@ -386,7 +396,8 @@ void vm::execute() {
         tvalue &n = _registers[base + opcode_util::val(arg_b)];
         lua_integer li;
         if (conv::tointeger(n, li)) {
-          _registers[ra] = ~li;
+          // _registers[ra] = ~li;
+          _registers.emplace(ra, ~li);
         }
         break;
       }

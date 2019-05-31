@@ -47,11 +47,13 @@ static void read_lua_string(bytecode_reader &reader, bytecode_architecture arch,
     // Small string
     for (size_t i = 0; i < (size_t)b_size - 1; i++) 
       vec.emplace_back((char)reader.read_byte());
+    vec.end_str();
   } else {
     // Long string
     size_t size = reader.read_sizet(arch);
     for (size_t i = 0; i < (size_t)size - 1; i++)
       vec.emplace_back((char)reader.read_byte());
+    vec.end_str();
   }
 }
 
@@ -159,7 +161,7 @@ void bytecode_reader::read_function(bytecode_architecture arch, bytecode_prototy
   /* We ignore the debugging info, but we have to advance the 
      stream anyway */
 
-  small_vector<char, 32> tmp_vec;
+  small_string<32> tmp_vec;
   int num_opcode_map = read_native_int(arch);
   for (int i = 0; i < num_opcode_map; i++)
     read_native_int(arch);
