@@ -112,8 +112,8 @@ bool tvalue::operator==(const tvalue &other) const {
     else if (data.is<string_vec>()) {
       // Compare string values
       string_vec &a = data.get<string_vec>(), &b = other.data.get<string_vec>();
-      if (a.size() != b.size()) return false;
-      for (size_t i = 0; i < a.size(); i++)
+      if (a.length() != b.length()) return false;
+      for (size_t i = 0; i < a.length(); i++)
         if (a[i] != b[i])
           return false;
     } else {

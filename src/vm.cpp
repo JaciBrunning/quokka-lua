@@ -241,8 +241,11 @@ void vm::execute() {
       case opcode::OP_SETUPVAL: {
         // Upval[B] = R(A)
         // NOTE: Assigns to stack value
-        lua_upval *upv = (*cl_ref)->lclosure().upval_refs[arg_a].get();
-        upv->value.emplace<size_t>(ra);
+        // lua_upval *upv = (*cl_ref)->lclosure().upval_refs[arg_a].get();
+        // upv->value.emplace<size_t>(ra);
+        tvalue *tv;
+        RL_VM_UPV(arg_b, tv, cl_ref);
+        *tv = _registers[ra];
         break;
       }
       case opcode::OP_SETTABLE:

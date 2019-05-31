@@ -1,4 +1,11 @@
-test_func = function(a)
-  test(a)
+function createAnonFunc()
+  local i = 0
+  return function()
+    i = i + 1
+    return i
+  end
 end
-test_func(888)
+
+func = createAnonFunc();
+test(func())
+test(func())
