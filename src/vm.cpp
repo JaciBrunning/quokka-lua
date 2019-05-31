@@ -70,6 +70,24 @@ tvalue &vm::argument(int id) {
   return _registers[_callinfo.last().func_idx + id + 1];
 }
 
+lua_table &vm::env() {
+  return _distinguished_env.data.get<object_store_ref>().get()->table();
+}
+
+object_store_ref vm::alloc_native_function(lua_native_closure::func_t f) {
+  object_store_ref r = alloc_object();
+  r.get()->native_closure().func = f;
+  return r;
+}
+
+void vm::define_native_function(const tvalue &key, lua_native_closure::func_t f) {
+  env().set(key, alloc_native_function(f));
+}
+
+int vm::num_params() {
+  return _registers.size() - (_callinfo.last().func_idx + 1);
+}
+
 // PRIVATE //
 
 bool vm::precall(size_t func_stack_idx, int nreturn) {

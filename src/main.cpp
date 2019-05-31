@@ -23,16 +23,11 @@ int main() {
   vm v;
   v.load(chunk);
 
-  object_store_ref oref = v.alloc_object();
-  oref.get()->native_closure().func = [](vm &v) {
+  v.define_native_function("print", [](vm &v) {
     tvalue &a = v.argument(0);
-    tvalue &b = v.argument(1);
-
-    std::cout << "Hello C from Lua!" << std::endl;
-    std::cout << conv::tonumber2(a) << ", " << conv::tonumber2(b) << std::endl;
+    std::cout << v.num_params() << std::endl;
     return 0;
-  };
-  v._distinguished_env.data.get<object_store_ref>().get()->table().set(tvalue("print"), tvalue(oref));
+  });
 
   v.call_at(0, 0);
 

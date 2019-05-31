@@ -46,6 +46,12 @@ namespace robotlua {
     // To be called from within a called function
     // Gets a local variable passed to a function. ID starts from 1
     tvalue &argument(int id);
+
+    lua_table &env();
+    object_store_ref alloc_native_function(lua_native_closure::func_t f);
+    void define_native_function(const tvalue &key, lua_native_closure::func_t f);
+    int num_params();
+    
   //  private:
     using call_ref = small_vector_base<lua_call>::continuous_reference;
     using reg_ref = small_vector_base<tvalue>::continuous_reference;

@@ -51,7 +51,6 @@ namespace robotlua {
   struct lua_object;
   struct lua_upval;
 
-  // TODO: Generify these
   class refcountable {
    public:
     bool is_free = true;
@@ -97,7 +96,8 @@ namespace robotlua {
   };
 
   struct lua_native_closure {
-    std::function<int(vm &)> func;
+    using func_t = std::function<int(vm &)>;
+    func_t func;
   };
 
   struct lua_closure {
