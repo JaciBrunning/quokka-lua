@@ -64,7 +64,10 @@ void vm::call(size_t nargs, int nreturn) {
 }
 
 tvalue &vm::argument(int id) {
-  return _registers[_callinfo.last().func_idx + id + 1];
+  // If we're calling a function outright, there is no _callinfo, since this can also
+  // be used to get return vals.
+  size_t idx = _callinfo.size() > 0 ? (_callinfo.last().func_idx + id + 1) : id;
+  return _registers[idx];
 }
 
 int vm::num_params() {
