@@ -28,12 +28,12 @@ namespace robotlua {
     }
 
     void end_str() {
-      if (length() == 0 || (*this)[length()] != '\0')
+      if ((*this)[length()] != '\0')
         this->emplace_back('\0');
     }
     
     char *c_str() {
-      return this->active_buffer();
+      return this->raw_buffer();
     }
 
     void concat(char c) {

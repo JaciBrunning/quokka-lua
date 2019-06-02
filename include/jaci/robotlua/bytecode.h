@@ -97,6 +97,7 @@ class bytecode_reader {
   const bytecode_architecture _sys_arch = bytecode_architecture::system();
 };
 
+#ifndef NO_BYTECODE_WRITER
 class bytecode_writer {
  public:
   bytecode_writer(std::ostream &stream, bytecode_architecture target_arch);
@@ -119,6 +120,7 @@ class bytecode_writer {
   bytecode_architecture _target_arch;
   const bytecode_architecture _sys_arch = bytecode_architecture::system();
 };
+#endif
 
 } // namespace robotlua
 } // namespace jaci

@@ -7,38 +7,52 @@
 namespace jaci {
 namespace robotlua {
 
-template <typename T>
-class small_vector_base {
+class small_vector_impl {
  public:
-  // A reference to a certain element in a small_vector, that is not invalidated
-  // like a regular iterator when the vector changes internal layout.
-  struct continuous_reference {
-    small_vector_base *vec;
-    size_t idx;
+  virtual void grow(size_t) = 0;
+  virtual void chop(size_t) = 0;
+  virtual bool is_stack() const = 0;
 
-    continuous_reference() : vec(nullptr) {}
-    continuous_reference(small_vector_base *v, size_t i) : vec(v), idx(i) {}
+  void reserve(size_t size);
+  void clear();
+  size_t size() const;
 
-    T *operator*() const {
-      return &vec->operator[](idx);
-    }
+ protected:
+  size_t _size = 0;
+};
 
-    T* get() const {
-      return &vec->operator[](idx);
-    }
+template <typename T>
+class small_vector_base : public small_vector_impl {
+ public:
+  virtual T* raw_buffer() const = 0;
 
-    bool operator==(const continuous_reference &other) const {
-      return (vec == other.vec) && (idx == other.idx);
-    }
+  T& operator[](size_t pos) const {
+    return raw_buffer()[pos];
+  }
 
-    bool is_valid() {
-      return vec != nullptr;
-    }
-  };
+  T& last() const {
+    return raw_buffer()[_size - 1];
+  }
 
-  virtual T& operator[](size_t) const = 0;
-  virtual void reserve(size_t) = 0;
-  virtual size_t size() const = 0;
+  void chop(size_t top) override {
+    for (size_t i = top; i < _size; i++)
+      (&raw_buffer()[i])->~T();
+    if (top < _size)
+      _size = top;
+  }
+
+  bool is_stack() const override {
+    return _heapvec == nullptr;
+  }
+
+ protected:
+  T* _heapvec = nullptr;
+
+  void clear_elements() {
+    clear();
+    if (_heapvec != nullptr)
+      free(_heapvec);
+  }
 };
 
 /**
@@ -54,120 +68,96 @@ class small_vector : public small_vector_base<T> {
   small_vector() { }
 
   small_vector(const small_vector &other) {
-    reserve(other.size());
+    this->reserve(other.size());
     for (size_t i = 0; i < other.size(); i++)
       emplace_back(other[i]);
   }
 
   ~small_vector() {
-    clear_elements();
+    this->clear_elements();
   }
 
   small_vector &operator=(const small_vector &other) {
-    clear();
-    reserve(other.size());
+    this->clear();
+    this->reserve(other.size());
     for (int i = 0; i < other.size(); i++)
       emplace_back(other[i]);
     return *this;
   }
 
-  T& operator[](size_t pos) const override {
-    return active_buffer()[pos];
-  }
-
-  T& last() const {
-    return active_buffer()[size() - 1];
-  }
-
-  void reserve(size_t size) override {
-    if (size > _size) {
-      grow(size);
-    }
-  }
-
   template<class... Args>
   T& emplace(size_t pos, Args&&... args) {
-    if (pos < _size) {
-      (&active_buffer()[pos])->~T();
+    if (pos < this->_size) {
+      (&raw_buffer()[pos])->~T();
     }
 
     while (pos >= _alloced_size)
-      grow(size() + GROW_BY);
+      grow(this->_size + GROW_BY);
     
-    T* place = &active_buffer()[pos];
+    T* place = &raw_buffer()[pos];
     new(place) T(std::forward<Args>(args)...);
-    if (pos >= _size)
-      _size++;
+    if (pos >= this->_size)
+      this->_size++;
     return *place;
   }
 
   template<class... Args>
   T& emplace_back(Args&&... args) {
-    return emplace(size(), std::forward<Args>(args)...);
+    return emplace(this->_size, std::forward<Args>(args)...);
   }
 
-  void chop(size_t top) {
-    for (size_t i = top; i < size(); i++) {
-      (&active_buffer()[i])->~T();
-    }
-    if (top < _size)
-      _size = top;
-  }
-
-  size_t size() const override {
-    return _size;
-  }
-
-  bool is_stack() const {
-    return _heapvec == nullptr;
-  }
-
-  void clear() {
-    for (size_t i = 0; i < _size; i++) {
-      (&active_buffer()[i])->~T();
-    }
-    _size = 0;
-  }
-
-  T* raw_buffer() const {
-    return active_buffer();
+  T* raw_buffer() const override {
+    if (this->_heapvec == nullptr)
+      return (T*)_stackvec;
+    return this->_heapvec;
   }
 
  protected:
   void grow(size_t next_size) {
     if (next_size > STACK_SIZE && next_size > _alloced_size) {
       T* new_buf = (T*)malloc(sizeof(T) * next_size);
-      for (size_t i = 0; i < _size; i++)
-        new(&new_buf[i]) T(active_buffer()[i]);
+      for (size_t i = 0; i < this->_size; i++)
+        new(&new_buf[i]) T(raw_buffer()[i]);
       
-      size_t os = _size;
-      clear_elements();
-      _size = os;
+      size_t os = this->_size;
+      this->clear_elements();
+      this->_size = os;
 
-      _heapvec = new_buf;
+      this->_heapvec = new_buf;
       _alloced_size = next_size;
-    }
-  }
-
-  T* active_buffer() const {
-    if (is_stack())
-      return (T*)_stackvec;
-    return _heapvec;
-  }
-
-  void clear_elements() {
-    clear();
-
-    if (!is_stack()) {
-      free(_heapvec);
     }
   }
 
  private:
   alignas(alignof(T)) char _stackvec[STACK_SIZE * sizeof(T)];
-  T* _heapvec = nullptr;
-  size_t _size = 0;
   size_t _alloced_size = STACK_SIZE;
+};
+
+// A reference to a certain element in a small_vector, that is not invalidated
+// like a regular iterator when the vector changes internal layout.
+template<typename T>
+struct continuous_reference {
+  small_vector_base<T> *vec;
+  size_t idx;
+
+  continuous_reference() : vec(nullptr) {}
+  continuous_reference(small_vector_base<T> *v, size_t i) : vec(v), idx(i) {}
+
+  T *operator*() const {
+    return &vec->operator[](idx);
+  }
+
+  T* get() const {
+    return &vec->operator[](idx);
+  }
+
+  bool operator==(const continuous_reference &other) const {
+    return (vec == other.vec) && (idx == other.idx);
+  }
+
+  bool is_valid() {
+    return vec != nullptr;
+  }
 };
 } // namespace robotlua
 } // namespace jaci

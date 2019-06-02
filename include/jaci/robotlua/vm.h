@@ -57,8 +57,8 @@ namespace robotlua {
     void define_native_function(const tvalue &key, lua_native_closure::func_t f);
     
    private:
-    using call_ref = small_vector_base<lua_call>::continuous_reference;
-    using reg_ref = small_vector_base<tvalue>::continuous_reference;
+    using call_ref = continuous_reference<lua_call>;
+    using reg_ref = continuous_reference<tvalue>;
 
     // Return true if C function
     bool precall(size_t func_stack_idx, int nreturn);

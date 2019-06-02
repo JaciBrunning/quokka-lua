@@ -63,35 +63,33 @@ namespace robotlua {
 
   // Store object reference with refcount.
   template<typename T>
-  struct store_refcountable : public small_vector_base<T>::continuous_reference {
-    using basevector_t = small_vector_base<T>;
+  struct store_refcountable : public continuous_reference<T> {
+    store_refcountable() : continuous_reference<T>(nullptr, 0) {}
 
-    store_refcountable() : basevector_t::continuous_reference(nullptr, 0) {}
-
-    store_refcountable(basevector_t *v, size_t id) : basevector_t::continuous_reference(v, id) {
-      if (basevector_t::continuous_reference::is_valid())
-        basevector_t::continuous_reference::get()->use();
+    store_refcountable(small_vector_base<T> *v, size_t id) : continuous_reference<T>(v, id) {
+      if (continuous_reference<T>::is_valid())
+        continuous_reference<T>::get()->use();
     }
 
     store_refcountable(const store_refcountable &other) : store_refcountable(other.vec, other.idx) {}
     store_refcountable(store_refcountable &&other) : store_refcountable(other.vec, other.idx) {}
 
     store_refcountable &operator=(const store_refcountable &other) {
-      if (basevector_t::continuous_reference::is_valid())
-        basevector_t::continuous_reference::get()->unuse();
+      if (continuous_reference<T>::is_valid())
+        continuous_reference<T>::get()->unuse();
       
       this->vec = other.vec;
       this->idx = other.idx;
 
-      if (basevector_t::continuous_reference::is_valid())
-        basevector_t::continuous_reference::get()->use();
+      if (continuous_reference<T>::is_valid())
+        continuous_reference<T>::get()->use();
       
       return *this;
     }
 
     ~store_refcountable() {
-      if (basevector_t::continuous_reference::is_valid())
-        basevector_t::continuous_reference::get()->unuse();
+      if (continuous_reference<T>::is_valid())
+        continuous_reference<T>::get()->unuse();
     }
   };
 

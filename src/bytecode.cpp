@@ -244,6 +244,7 @@ lua_number bytecode_reader::read_lua_number(bytecode_architecture arch) {
 
 /* WRITER */
 
+#ifndef NO_BYTECODE_WRITER
 template<typename VT>
 static void write_lua_string(bytecode_writer &writer, VT &vec) {
   if (vec.size() + 1 < 0xFF) {
@@ -387,3 +388,4 @@ void bytecode_writer::write_lua_integer(lua_integer i) {
 void bytecode_writer::write_lua_number(lua_number n) {
   write_numeric<lua_number>(n, _stream, _target_arch.little, _target_arch.sizeof_lua_number, _sys_arch.little);
 }
+#endif

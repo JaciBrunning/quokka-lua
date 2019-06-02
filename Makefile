@@ -12,7 +12,7 @@ SOURCES = $(shell find $(SRC_PATH) -name '*.$(SRC_EXT)' | sort -k 1nr | cut -f2-
 OBJECTS = $(SOURCES:$(SRC_PATH)/%.$(SRC_EXT)=$(BUILD_PATH)/%.o)
 DEPS = $(OBJECTS:.o=.d)
 
-COMPILE_FLAGS = -std=c++11 -Wall -Wextra -Os
+COMPILE_FLAGS = -std=c++11 -Wall -Wextra -g -Os
 INCLUDES = -I include/
 LIBS =
 
@@ -45,6 +45,8 @@ all: $(BIN_PATH)/$(BIN_NAME)
 	@$(RM) $(BIN_NAME)
 	@ln -s $(BIN_PATH)/$(BIN_NAME) $(BIN_NAME)
 	@luac light.lua
+	@cp $(BIN_PATH)/$(BIN_NAME) $(BIN_PATH)/$(BIN_NAME).strip
+	@strip $(BIN_PATH)/$(BIN_NAME).strip
 
 # Creation of the executable
 $(BIN_PATH)/$(BIN_NAME): $(OBJECTS)
