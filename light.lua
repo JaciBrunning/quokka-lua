@@ -1,11 +1,4 @@
-function createAnonFunc()
-  local i = 0
-  return function()
-    i = i + 1
-    return i
-  end
+function test(a)
+  print("test called")
+  return a, a*2
 end
-
-func = createAnonFunc();
-test(func())
-test(func())

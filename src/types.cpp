@@ -1,6 +1,7 @@
 #include "jaci/robotlua/types.h"
 
 #include <new>
+#include <cstring>
 
 using namespace jaci::robotlua;
 
@@ -75,7 +76,7 @@ tvalue::tvalue(object_store_ref ref) {
 
 tvalue::tvalue(uint8_t tagt) : tag_type(tagt) {
   tag t = get_tag_from_tag_type(tagt);
-  variant v = get_variant_from_tag_type(tagt);
+  //variant v = get_variant_from_tag_type(tagt);
   if (t == tag::STRING) {
     data.emplace<string_vec>();
   } else {
@@ -97,6 +98,10 @@ bool tvalue::is_falsey() {
 
 object_store_ref tvalue::obj() {
   return data.get<object_store_ref>();
+}
+
+tvalue::string_vec &tvalue::str() {
+  return data.get<string_vec>();
 }
 
 bool tvalue::operator==(const tvalue &other) const {
@@ -123,6 +128,32 @@ bool tvalue::operator==(const tvalue &other) const {
   }
 
   return true;
+}
+
+bool tvalue::operator<(const tvalue &other) const {
+  if (get_tag_from_tag_type(tag_type) == get_tag_from_tag_type(other.tag_type)) {
+    lua_number na, nb;
+    if (conv::tonumber((tvalue &)*this, na) && conv::tonumber((tvalue &)other, nb)) {
+      return na < nb;
+    } else if (data.is<string_vec>()) {
+      int strc = strcmp(data.get<string_vec>().c_str(), other.data.get<string_vec>().c_str());
+      return strc < 0;
+    }
+  }
+  return false;
+}
+
+bool tvalue::operator<=(const tvalue &other) const {
+  if (get_tag_from_tag_type(tag_type) == get_tag_from_tag_type(other.tag_type)) {
+    lua_number na, nb;
+    if (conv::tonumber((tvalue &)*this, na) && conv::tonumber((tvalue &)other, nb)) {
+      return na <= nb;
+    } else if (data.is<string_vec>()) {
+      int strc = strcmp(data.get<string_vec>().c_str(), other.data.get<string_vec>().c_str());
+      return strc <= 0;
+    }
+  }
+  return false;
 }
 
 tvalue lua_table::get(const tvalue &key) const {

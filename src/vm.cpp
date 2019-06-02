@@ -58,11 +58,8 @@ upval_ref vm::alloc_upval() {
 }
 
 void vm::call(size_t nargs, int nreturn) {
-
-}
-
-void vm::call_at(size_t func_stack_idx, int nreturn) {
-  if (!precall(func_stack_idx, nreturn))
+  size_t stack_idx = _registers.size() - nargs - 1;
+  if (!precall(stack_idx, nreturn))
     execute();
 }
 
@@ -76,6 +73,16 @@ int vm::num_params() {
 
 void vm::push(const tvalue &v) {
   _registers.emplace_back(v);
+}
+
+tvalue &vm::pop() {
+  tvalue &v = _registers.last();
+  _registers.chop(_registers.size() - 1);
+  return v;
+}
+
+void vm::pop(size_t num) {
+  _registers.chop(_registers.size() - num);
 }
 
 lua_table &vm::env() {
@@ -133,9 +140,6 @@ bool vm::precall(size_t func_stack_idx, int nreturn) {
     ci.callstatus = CALL_STATUS_LUA;
     ci.func_idx = func_stack_idx;
     ci.numresults = nreturn;
-    // TODO: Need top?
-    // ci.top = base + proto->max_stack_size;
-    // NOTE: Am I missing setting registers top?
     ci.info.lua.base = base;
     ci.info.lua.pc = &proto->instructions[0];   // TODO: Should this be a pointer?
     return false;
@@ -152,6 +156,7 @@ bool vm::precall(size_t func_stack_idx, int nreturn) {
     postcall(_registers.size() - n, n);
     return true;
   }
+  return true;
 }
 
 #define RL_VM_PC(ci_ref) ((*ci_ref)->info.lua.pc)
@@ -254,7 +259,6 @@ void vm::execute() {
         break;
       case opcode::OP_NEWTABLE: {
         // R(A) = {} (size = B,C)
-        // TODO: B is size of array, C is size of hash. I don't think we need this
         object_store_ref objref = alloc_object();
         (*objref)->table();
         _registers.emplace(ra, objref);
@@ -445,10 +449,11 @@ void vm::execute() {
         }
         break;
       }
-      case opcode::OP_CONCAT:
+      case opcode::OP_CONCAT: {
         // R(A) = R(B) .. .. R(C)
-        // TODO: 
+        // TODO:
         break;
+      }
       case opcode::OP_JMP: {
         // pc += sBx; if (A) close all upvals >= R(A - 1)
         if (arg_a != 0) {
@@ -462,18 +467,20 @@ void vm::execute() {
         // if ((RK(B) == RK(C)) ~= A) then pc++ (skip jmp), otherwise do next jump
         if ((RL_VM_RK(arg_b) == RL_VM_RK(arg_c)) != arg_a) {
           RL_VM_PC(ci_ref)++;
-        } else {
-          // Continue to next instruction (jmp)
         }
         break;
       }
       case opcode::OP_LT:
         // if ((RK(B) <  RK(C)) ~= A) then pc++ (skip jmp), otherwise do next jump
-        // TODO:
+        if ((RL_VM_RK(arg_b) < RL_VM_RK(arg_c)) != arg_a) {
+          RL_VM_PC(ci_ref)++;
+        }
         break;
       case opcode::OP_LE:
         // if ((RK(B) <= RK(C)) ~= A) then pc++ (skip jmp), otherwise do next jump
-        // TODO:
+        if ((RL_VM_RK(arg_b) <= RL_VM_RK(arg_c)) != arg_a) {
+          RL_VM_PC(ci_ref)++;
+        }
         break;
       case opcode::OP_TEST: {
         // if not (R(A) <=> C) then pc++
@@ -502,29 +509,46 @@ void vm::execute() {
         if (arg_b != 0) {
           // Set new top? This should be done already.
         }
-        if (precall(ra, nresults)) {
-          // C Func, already called
-        } else {
+        if (!precall(ra, nresults)) {
           // Lua Func
           goto new_call;
         }
         break;
       }
-      case opcode::OP_TAILCALL:
+      case opcode::OP_TAILCALL: {
         // return R(A)(R(A+1) ... R(A+B-1))
         // -1 = multiret
         if (!precall(ra, -1)) {
           // Lua function
-        } else {
-          // TODO:
+          size_t oci_idx = _callinfo.size() - 2;
+          lua_call &nci = _callinfo.last();                 // New, called frame
+          lua_call &oci = _callinfo[oci_idx];  // Caller frame
+
+          size_t lim = nci.info.lua.base + _registers[nci.func_idx].obj().get()->lclosure().proto->num_params;
+
+          if ((*cl_ref)->lclosure().proto->num_params > 0)
+            close_upvals(oci.info.lua.base);
+          
+          // Move called frame into the caller
+          for (int aux = 0; nci.func_idx + aux < lim; aux++) {
+            _registers.emplace(oci.func_idx + aux, _registers[nci.func_idx + aux]);
+          }
+
+          oci.info.lua.base = oci.func_idx + (nci.info.lua.base - nci.func_idx);
+          oci.info.lua.pc = nci.info.lua.pc;
+          oci.callstatus |= CALL_STATUS_TAIL;
+          // Remove new frame
+          _callinfo.chop(oci_idx + 1);
+          goto new_call;
         }
         break;
+      }
       case opcode::OP_RETURN: {
         if ((*cl_ref)->lclosure().proto->num_protos > 0) {
           // Close upvals
           close_upvals(base);
         }
-        bool bb = postcall(ra, (arg_b != 0 ? (arg_b - 1) : (_registers.size() - ra)));
+        postcall(ra, (arg_b != 0 ? (arg_b - 1) : (_registers.size() - ra)));
         if ((*ci_ref)->callstatus & CALL_STATUS_FRESH)
           return;   // Invoked externally, can just return
         else {
@@ -564,15 +588,84 @@ void vm::execute() {
         tvalue &limit = _registers[ra + 1];
         tvalue &step = _registers[ra + 2];
 
-        // TODO:
+        lua_integer int_limit;
+        bool valid_int_limit = conv::tointeger(limit, int_limit);
+
+        if (init.data.is<lua_integer>() && step.data.is<lua_integer>() && valid_int_limit) {
+          lua_integer istep = step.data.get<lua_integer>();
+          lua_integer iinit = init.data.get<lua_integer>();
+          
+          limit.data.emplace<lua_integer>(int_limit);
+          init.data.emplace<lua_integer>(iinit - istep);
+        } else {
+          // Try making everything a float
+          lua_number nlimit, ninit, nstep;
+          if (!conv::tonumber(init, ninit)) {}
+          if (!conv::tonumber(limit, nlimit)) {}
+          if (!conv::tonumber(step, nstep)) {}
+          // TODO: Error if number conversion fails
+          limit.data.emplace<lua_number>(nlimit);
+          init.data.emplace<lua_number>(ninit - nstep);
+          step.data.emplace<lua_number>(nstep);
+        }
+        RL_VM_PC(ci_ref) += opcode_util::get_sBx(instruction);
         break;
       }
-      case opcode::OP_TFORCALL:
+      case opcode::OP_TFORCALL: {
+        // R(A+3) ... R(A+2+C) = R(A)( R(A+1), R(A+2) )
+        // Setup the R(A)( R(A+1), R(A+2) )
+        size_t call_base = ra + 3;
+        _registers.emplace(call_base + 2, _registers[ra + 2]);
+        _registers.emplace(call_base + 1, _registers[ra + 1]);
+        _registers.emplace(call_base, _registers[ra]);
+        // Expecting arg_c return values
+        if (!precall(call_base, arg_c))
+          execute();
+        // Next instruction is OP_TFORLOOP, so let the loop go ahead
         break;
-      case opcode::OP_TFORLOOP:
+      }
+      case opcode::OP_TFORLOOP: {
+        // if R(A+1) ~= nil then { R(A) = R(A+1); pc += sBx }
+        tvalue &tv1 = _registers[ra + 1];
+        if (!tv1.is_nil()) {
+          _registers.emplace(ra, tv1);
+          RL_VM_PC(ci_ref) += opcode_util::get_sBx(instruction);
+        }
         break;
-      case opcode::OP_SETLIST:
+      }
+      case opcode::OP_SETLIST: {
+        // R(A)[(C - 1) * FPF + i] = R(A+i), 1 <= i <= B
+        // Note that in lua, FPF is LFIELDS_PER_FLUSH, a magic value of '50'
+        // that's been in the Lua source for the last 15 years. It's not possible
+        // to infer the value of FPF from the bytecode alone, so there is a huge 
+        // assumption here that FPF=50.
+        // Note that if B == 0, b = reg top - ra - 1
+        // Note also that if C == 0, c = extra arg as Ax
+        size_t fpf = 50;
+        size_t b = arg_b;
+        size_t c = arg_c;
+        lua_table &table = _registers[ra].obj().get()->table();
+
+        if (b == 0) {
+          // b = reg top - ra - 1
+          b = _registers.size() - ra - 1;
+        }
+        if (c == 0) {
+          // Get extra arg
+          c = opcode_util::get_Ax(*(RL_VM_PC(ci_ref)++));
+        }
+        size_t stack_pop = _registers.size() - b;
+
+        // Work backwards, saves us assigning a new iterator var
+        lua_integer table_idx = ((c - 1) * fpf + b);
+        for (; b > 0; b--) {
+          table.set(table_idx--, _registers[ra + b]);
+        }
+
+        // Pop the stack constants
+        _registers.chop(stack_pop);
         break;
+      }
       case opcode::OP_CLOSURE: {
         // R(A) = closure(KPROTO[Bx])
         lua_lclosure &this_closure = (*cl_ref)->lclosure();
@@ -585,8 +678,25 @@ void vm::execute() {
         }
         break;
       }
-      case opcode::OP_VARARG:
+      case opcode::OP_VARARG: {
+        // R(A) R(A+1) ... R(A+B-2) = vararg
+        // b = required results
+        int b = arg_b - 1;
+        int n = (base - (*ci_ref)->func_idx) - (*cl_ref)->lclosure().proto->num_params - 1;
+        // Less args than params
+        if (n < 0)
+          n = 0;
+        if (b < 0)
+          b = n;
+        
+        int j;
+        for (j = 0; j < b && j < n; j++)
+          _registers.emplace(ra + j, _registers[base - n + j]);
+        for (; j < b; j++)
+          _registers.emplace(ra + j); // nil
+        
         break;
+      }
       default:
         /* Not supported */
         break;
@@ -612,15 +722,15 @@ bool vm::postcall(size_t first_result_idx, int nreturn) {
       _registers.emplace(res, _registers[first_result_idx]);
       break;
     }
-    case -1: {
+    case MULTIRET: {
       // Multiple returns
-      for (size_t i = 0; i < nreturn; i++)
+      for (int i = 0; i < nreturn; i++)
         _registers.emplace(res + i, _registers[first_result_idx + i]);
       _registers.chop(res + nreturn);
       return false;
     }
     default: {
-      size_t i;
+      int i;
       if (wanted <= nreturn) {
         // Have enough (or more than enough) results
         for (i = 0; i < wanted; i++)

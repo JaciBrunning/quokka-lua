@@ -22,13 +22,13 @@ namespace robotlua {
      * Distinct to size() since size() includes the C \0 
      * string termination character (null byte)
      */
-    size_t length() {
+    size_t length() const {
       size_t s = this->size();
       return s == 0 ? s : s - 1;
     }
 
     void end_str() {
-      if ((*this)[length()] != '\0')
+      if (length() == 0 || (*this)[length()] != '\0')
         this->emplace_back('\0');
     }
     
@@ -46,7 +46,7 @@ namespace robotlua {
 
     template<typename STRING_LIKE>
     void concat(const STRING_LIKE &other) {
-      for (size_t i = 0; i < other.len(); i++) {
+      for (size_t i = 0; i < other.length(); i++) {
         concat(other[i]);
       }
     }

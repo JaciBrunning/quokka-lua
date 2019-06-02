@@ -124,8 +124,7 @@ inline uint32_t get_Bx(lua_instruction instruction) {
 
 // excess-k format (offset binary)
 inline int32_t get_sBx(lua_instruction instruction) {
-  uint32_t v = (instruction >> (6 + 8)) & 0x3FFFF;
-  return (int32_t)v - (int32_t)(v & 0x20000);
+  return ((int32_t)get_Bx(instruction)) - 0x1FFFF;
 }
 
 inline uint32_t get_Ax(lua_instruction instruction) {

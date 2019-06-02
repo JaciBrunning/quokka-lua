@@ -12,6 +12,8 @@ namespace robotlua {
   #define CALL_STATUS_FRESH (1 << 3)
   #define CALL_STATUS_TAIL (1 << 5)
 
+  const int MULTIRET = -1;
+
   struct lua_call {
     // Index of the function in the stack
     size_t func_idx;
@@ -41,19 +43,20 @@ namespace robotlua {
      * Call a function that has its closure on the register stack already
      */
     void call(size_t nargs, int nreturn);
-    void call_at(size_t func_stack_idx, int nresults);
 
     // To be called from within a called function
     // Gets a local variable passed to a function. ID starts from 1
     tvalue &argument(int id);
     int num_params();
     void push(const tvalue &v);
+    tvalue &pop();
+    void pop(size_t num);
 
     lua_table &env();
     object_store_ref alloc_native_function(lua_native_closure::func_t f);
     void define_native_function(const tvalue &key, lua_native_closure::func_t f);
     
-  //  private:
+   private:
     using call_ref = small_vector_base<lua_call>::continuous_reference;
     using reg_ref = small_vector_base<tvalue>::continuous_reference;
 

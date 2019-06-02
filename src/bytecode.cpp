@@ -15,6 +15,26 @@ static inline uint32_t __bswap_32(uint32_t v) {
 static inline uint64_t __bswap_64(uint64_t v) {
   return OSSwapInt64(v);
 }
+#elif defined(NO_BYTESWAP)
+static inline uint16_t __bswap_16(uint16_t v) {
+  return ((uint16_t) ((((v) >> 8) & 0xff) | (((v) & 0xff) << 8)));
+}
+
+static inline uint32_t __bswap_32(uint32_t v) {
+  return ((((v) & 0xff000000u) >> 24) | (((v) & 0x00ff0000u) >> 8)
+   | (((v) & 0x0000ff00u) << 8) | (((v) & 0x000000ffu) << 24));
+}
+
+static inline uint64_t __bswap_64(uint64_t v) {
+  return ((((v) & 0xff00000000000000ull) >> 56)	
+   | (((v) & 0x00ff000000000000ull) >> 40)	
+   | (((v) & 0x0000ff0000000000ull) >> 24)	
+   | (((v) & 0x000000ff00000000ull) >> 8)	
+   | (((v) & 0x00000000ff000000ull) << 8)	
+   | (((v) & 0x0000000000ff0000ull) << 24)	
+   | (((v) & 0x000000000000ff00ull) << 40)	
+   | (((v) & 0x00000000000000ffull) << 56));
+}
 #else
 #include <byteswap.h>
 #endif

@@ -15,14 +15,22 @@ int main() {
   vm v;
   v.load(chunk);
 
-  v.define_native_function("test", [](vm &v) {
+  v.define_native_function("print", [](vm &v) {
     tvalue &a = v.argument(0);
-    std::cout << conv::tonumber2(a) << std::endl;
-    v.push(12.5);
-    return 1;
+    if (a.data.is<tvalue::string_vec>())
+      std::cout << a.data.get<tvalue::string_vec>().c_str() << std::endl;
+    else
+      std::cout << conv::tonumber2(a) << std::endl;
+    return 0;
   });
 
-  v.call_at(0, 0);
+  v.call(0, 0);
+
+  v.push(v.env().get("test"));
+  v.push(123);
+  v.call(1, 2);
+  std::cout << conv::tonumber2(v.argument(0)) << " " << conv::tonumber2(v.argument(1)) << std::endl;
+  v.pop(2);
 
   return 0;
 }

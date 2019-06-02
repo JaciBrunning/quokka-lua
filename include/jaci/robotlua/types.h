@@ -85,6 +85,8 @@ namespace robotlua {
 
       if (basevector_t::continuous_reference::is_valid())
         basevector_t::continuous_reference::get()->use();
+      
+      return *this;
     }
 
     ~store_refcountable() {
@@ -142,7 +144,11 @@ namespace robotlua {
     bool is_nil();
     bool is_falsey();
     object_store_ref obj();
+    string_vec &str();
+
     bool operator==(const tvalue &) const;
+    bool operator<(const tvalue &) const;
+    bool operator<=(const tvalue &) const;
   };
 
   struct lua_table {
@@ -234,7 +240,12 @@ namespace robotlua {
         return true;
       } else if (src.data.is<tvalue::string_vec>()) {
         // Try to parse string
-        return false;
+        char *end;
+        lua_number n = strtod(src.data.get<tvalue::string_vec>().c_str(), &end);
+        if (*end != '\0')
+          return false;
+        out = n;
+        return true;
       }
       return false;
     }
@@ -246,15 +257,19 @@ namespace robotlua {
     }
 
     inline bool tointeger(tvalue &src, lua_integer &out) {
+      lua_number n;
       if (src.data.is<lua_integer>()) {
         out = src.data.get<lua_integer>();
         return true;
-      } else if (src.data.is<lua_number>()) {
-        out = (lua_integer) src.data.get<lua_number>();
+      } else if (tonumber(src, n)) {
+        // Safe for doubles to be converted to int
+        if (n < std::numeric_limits<lua_integer>::lowest())
+          out = std::numeric_limits<lua_integer>::lowest();
+        else if (n > std::numeric_limits<lua_integer>::max())
+          out = std::numeric_limits<lua_integer>::max();
+        else
+          out = (lua_integer) n;
         return true;
-      } else if (src.data.is<tvalue::string_vec>()) {
-        // Try to parse string
-        return false;
       }
       return false;
     }

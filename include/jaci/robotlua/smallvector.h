@@ -140,7 +140,9 @@ class small_vector : public small_vector_base<T> {
       for (size_t i = 0; i < _size; i++)
         new(&new_buf[i]) T(active_buffer()[i]);
       
+      size_t os = _size;
       clear_elements();
+      _size = os;
 
       _heapvec = new_buf;
       _alloced_size = next_size;
