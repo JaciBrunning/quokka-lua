@@ -34,6 +34,10 @@ namespace engine {
   class quokka_vm {
    public:
     quokka_vm();
+    quokka_vm(bytecode_chunk &bc) : quokka_vm() {
+      load(bc);
+    }
+    
     void load(bytecode_chunk &);
 
     object_store_ref alloc_object();
