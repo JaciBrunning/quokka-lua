@@ -4,8 +4,8 @@
 #include <new>
 #include <typeinfo>
 
-namespace jaci {
-namespace robotlua {
+namespace quokka {
+namespace engine {
 
   // Simple implementation of std::variant, using C++ compile-time magic
   // in order to provide a union of complex (non-trivial) types.
@@ -146,5 +146,5 @@ namespace robotlua {
 
     bool is_assigned() const { return (_type_id != typeid(void).hash_code()); }
   };
-}  // namespace robotlua
-}  // namespace jaci
+}  // namespace engine
+}  // namespace quokka

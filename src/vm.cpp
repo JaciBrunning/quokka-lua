@@ -1,9 +1,9 @@
-#include "jaci/robotlua/vm.h"
-#include "jaci/robotlua/opcodes.h"
+#include "quokka/engine/vm.h"
+#include "quokka/engine/opcodes.h"
 
 #include <math.h>
 
-using namespace jaci::robotlua;
+using namespace quokka::engine;
 
 vm::vm() {
   // Load distinguished env.

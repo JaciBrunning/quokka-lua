@@ -7,8 +7,8 @@
 #include "smallstring.h"
 #include "simplevariant.h"
 
-namespace jaci {
-namespace robotlua {
+namespace quokka {
+namespace engine {
   using lua_instruction = size_t;
   using lua_integer     = int;
   using lua_number      = double;
@@ -148,7 +148,7 @@ namespace robotlua {
    * Lua objects are datatypes that are described by more than just their value. Unline
    * numbers, strings, and booleans, objects can be complex, such as Tables. 
    * 
-   * In RobotLua, objects are allocated into one large pool (analogous to the heap),
+   * In Quokka LE, objects are allocated into one large pool (analogous to the heap),
    * and automatically dealloced when their usages reach zero. Note that objects are distinct
    * to upvalues, as objects do not (on their own) go above their own scope unless they are
    * used in an upvalue. 
@@ -209,5 +209,5 @@ namespace robotlua {
 
     void on_refcount_zero() override;
   };
-}  // namespace robotlua
-}  // namespace jaci
+}  // namespace engine
+}  // namespace quokka

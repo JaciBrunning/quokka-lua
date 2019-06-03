@@ -5,7 +5,7 @@ SRC_PATH = src
 BUILD_PATH = build
 BIN_PATH = $(BUILD_PATH)/bin
 
-BIN_NAME = robotlua
+BIN_NAME = quokka
 
 SRC_EXT = cpp
 SOURCES = $(shell find $(SRC_PATH) -name '*.$(SRC_EXT)' | sort -k 1nr | cut -f2-)

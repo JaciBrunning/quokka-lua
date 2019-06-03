@@ -125,8 +125,6 @@ Protos are just another name for internal functions. In this case, this is reall
 | Array of protos (functions) |
 
 ## Debug Info (DumpDebug)
-In RobotLua, we leave debugging info out of our bytecode transpiling, and ignore it in our runtime. 
-
 | Type | Desc |
 | ---- | ---- |
 | Int | Number of entries in the opcode to source line table (0 if stripped) |

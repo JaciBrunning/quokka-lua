@@ -4,8 +4,8 @@
 #include <utility>
 #include <stdlib.h>
 
-namespace jaci {
-namespace robotlua {
+namespace quokka {
+namespace engine {
 
 class small_vector_impl {
  public:
@@ -159,5 +159,5 @@ struct continuous_reference {
     return vec != nullptr;
   }
 };
-} // namespace robotlua
-} // namespace jaci
+} // namespace engine
+} // namespace quokka

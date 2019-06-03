@@ -2,8 +2,8 @@
 
 #include "smallvector.h"
 
-namespace jaci {
-namespace robotlua {
+namespace quokka {
+namespace engine {
   template<size_t STACK_SIZE, size_t GROW_BY=STACK_SIZE>
   class small_string : public small_vector<char, STACK_SIZE, GROW_BY> {
    public:
@@ -59,4 +59,4 @@ namespace robotlua {
     }
   };
 }
-}  // namespace jaci
+}  // namespace quokka

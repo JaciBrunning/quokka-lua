@@ -2,8 +2,8 @@
 
 #include "types.h"
 
-namespace jaci {
-namespace robotlua {
+namespace quokka {
+namespace engine {
 // Directly taken from lopcodes.h in the Lua source
 enum class opmode { iABC = 0, iABx, iAsBx, iAx };
 
@@ -133,5 +133,5 @@ inline uint32_t get_Ax(lua_instruction instruction) {
 
 }
 
-} // namespace robotlua
-} // namespace jaci
+} // namespace engine
+} // namespace quokka

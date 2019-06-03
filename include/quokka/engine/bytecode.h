@@ -8,8 +8,8 @@
 #include "smallvector.h"
 #include "types.h"
 
-namespace jaci {
-namespace robotlua {
+namespace quokka {
+namespace engine {
 
 struct bytecode_architecture {
   bool little;
@@ -122,5 +122,5 @@ class bytecode_writer {
 };
 #endif
 
-} // namespace robotlua
-} // namespace jaci
+} // namespace engine
+} // namespace quokka
