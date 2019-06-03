@@ -80,7 +80,7 @@ class small_vector : public small_vector_base<T> {
   small_vector &operator=(const small_vector &other) {
     this->clear();
     this->reserve(other.size());
-    for (int i = 0; i < other.size(); i++)
+    for (size_t i = 0; i < other.size(); i++)
       emplace_back(other[i]);
     return *this;
   }

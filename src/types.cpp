@@ -121,12 +121,6 @@ bool tvalue::tonumber(lua_number &out) const {
   return false;
 }
 
-lua_number tvalue::tonumber() const {
-  lua_number n = 0;
-  tonumber(n);
-  return n;
-}
-
 bool tvalue::tointeger(lua_integer &out) const {
   lua_number n;
   if (data.is<lua_integer>()) {
@@ -145,10 +139,31 @@ bool tvalue::tointeger(lua_integer &out) const {
   return false;
 }
 
-lua_integer tvalue::tointeger() const {
-  lua_integer i = 0;
-  tointeger(i);
-  return i;
+bool tvalue::tostring(string_t &out) const {
+  char buf[16];
+  out.clear();
+  if (data.is<tvalue::string_t>()) {
+    out.concat_str(data.get<tvalue::string_t>());
+    return true;
+  } else if (data.is<lua_integer>()) {
+    snprintf(buf, 16, "%d", data.get<lua_integer>());
+    out.concat(buf);
+    return true;
+  } else if (data.is<lua_number>()) {
+    snprintf(buf, 16, "%f", data.get<lua_number>());
+    out.concat(buf);
+    return true;
+  } else if (data.is<bool>()) {
+    out.concat(data.get<bool>() ? "true" : "false");
+    return true;
+  } else if (is_nil()) {
+    out.concat("nil");
+    return true;
+  } else if (is_object()) {
+    out.concat(obj().get()->is_table() ? "table: <unknown>" : "function: <unknown>");
+    return true;
+  }
+  return false;
 }
 
 bool tvalue::operator==(const tvalue &other) const {

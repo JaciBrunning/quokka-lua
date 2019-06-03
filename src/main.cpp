@@ -12,19 +12,15 @@ int main() {
   bytecode_chunk chunk;
   reader.read_chunk(chunk);
 
-  vm v;
+  quokka_vm v;
   v.load(chunk);
 
-  v.define_native_function("print", [](vm &v) {
-    tvalue &a = v.argument(0);
-    if (a.data.is<tvalue::string_t>())
-      std::cout << a.data.get<tvalue::string_t>().c_str() << std::endl;
-    else
-      std::cout << a.tonumber() << std::endl;
+  v.define_native_function("print", [](quokka_vm &v) {
+    std::cout << v.argument(0).tostring().c_str() << std::endl;
     return 0;
   });
 
-  v.call(0, 0);
+  v.call();
 
   v.push(v.env().get("test"));
   v.push(123);

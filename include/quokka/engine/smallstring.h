@@ -45,7 +45,7 @@ namespace engine {
     }
 
     template<typename STRING_LIKE>
-    void concat(const STRING_LIKE &other) {
+    void concat_str(const STRING_LIKE &other) {
       for (size_t i = 0; i < other.length(); i++) {
         concat(other[i]);
       }

@@ -81,9 +81,8 @@ namespace engine {
 
   // Note: fwd declaration of bytecode_prototype in bytecode.h
   struct bytecode_prototype;
-
-  // Note: fwd declaration of vm in vm.h (needed by lua_native_closure funcdec)
-  class vm;
+  // Note: fwd declaration of quokka_vm in vm.h (needed by lua_native_closure funcdec)
+  class quokka_vm;
 
   struct tvalue {
     using string_t = small_string<32>;
@@ -109,13 +108,42 @@ namespace engine {
     bool is_nil() const;
     bool is_falsey() const;
 
+    inline bool is_number() const {
+      return data.is<lua_number>() || data.is<lua_integer>();
+    }
+
+    inline bool is_integer() const { return data.is<lua_integer>(); }
+    inline bool is_decimal() const { return data.is<lua_number>(); }
+    
+    inline bool is_bool() const { return data.is<bool>(); }
+    inline bool is_string() const { return data.is<string_t>(); }
+
+    inline bool is_object() const { return data.is<object_store_ref>(); }
+
     object_store_ref obj() const;
 
     bool tonumber(lua_number &out) const;
-    lua_number tonumber() const;
     bool tointeger(lua_integer &out) const;
-    lua_integer tointeger() const;
+    bool tostring(string_t &out) const;
 
+    inline lua_number tonumber() const {
+      lua_number n = 0;
+      tonumber(n);
+      return n;
+    }
+
+    inline lua_integer tointeger() const {
+      lua_integer i = 0;
+      tointeger(i);
+      return i;
+    }
+
+    inline string_t tostring() const {
+      string_t s("");
+      tostring(s);
+      return s;
+    }
+    
     bool operator==(const tvalue &) const;
     bool operator<(const tvalue &) const;
     bool operator<=(const tvalue &) const;
@@ -140,7 +168,7 @@ namespace engine {
   };
 
   struct lua_native_closure {
-    using func_t = std::function<int(vm &)>;
+    using func_t = std::function<int(quokka_vm &)>;
     func_t func;
   };
 
@@ -165,6 +193,9 @@ namespace engine {
     lua_native_closure &native_closure();
 
     lua_tag_type get_tag_type() const;
+
+    inline bool is_table() const { return data.is<lua_table>(); }
+    inline bool is_function() const { return !is_table(); };
 
     void on_refcount_zero() override;
   };

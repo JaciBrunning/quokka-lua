@@ -31,9 +31,9 @@ namespace engine {
   };
 
   // Our equivilent of lua_state
-  class vm {
+  class quokka_vm {
    public:
-    vm();
+    quokka_vm();
     void load(bytecode_chunk &);
 
     object_store_ref alloc_object();
@@ -42,7 +42,7 @@ namespace engine {
     /**
      * Call a function that has its closure on the register stack already
      */
-    void call(size_t nargs, int nreturn);
+    void call(size_t nargs = 0, int nreturn = 0);
 
     // To be called from within a called function
     // Gets a local variable passed to a function. ID starts from 1
