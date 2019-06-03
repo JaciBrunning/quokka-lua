@@ -108,11 +108,32 @@ namespace engine {
   struct bytecode_prototype;
   class quokka_vm;
 
+  /**
+   * lua_value is the main container for data in Lua, containing the value of any variables
+   * used in the program.
+   * 
+   * lua_value is polymorphic, in similar representation to a C-style union due to the use of
+   * simple_variant. Because of this, all lua_values are the same size, regardless of the 
+   * data they hold. 
+   * 
+   * The type of the lua_value can be determined using one of the following methods:
+   *    - is_* functions
+   *    - data.is<type>()
+   * For example, `value.is_numeric()` or `value.data.is<bool>()`
+   * 
+   * The value of the lua_value can be obtained through one of the following methods.
+   *    - data.get<type>()    Note this does NOT check the data type, you should check the type prior to calling
+   *    - obj()->get()        Shortcut for accessing an object, through which table and function types can be accessed.
+   *                          Note that this does not check data type.
+   *    - to* conversion functions  Convert types if applicable. These do perform type checking and coercion where necessary
+   */
   struct lua_value {
     using string_t = small_string<32>;
 
     /**
-     * no type: Nil
+     * Data storage for the lua_value. 
+     * 
+     * <unassigned>: Nil
      * bool: Boolean
      * lua_number: Number (float)
      * lua_integer: Number (integer)
@@ -121,47 +142,126 @@ namespace engine {
      */
     simple_variant<bool, lua_number, lua_integer, string_t, object_store_ref> data;
 
+    /**
+     * Create a new lua_value of type Nil
+     */
     lua_value();             // Nil
+    /**
+     * Create a new lua_value of type Bool
+     */
     lua_value(bool);         // Bool
+    /**
+     * Create a new lua_value of type Integer
+     */
     lua_value(lua_integer);  // Int
-    lua_value(lua_number);   // Float
+    /**
+     * Create a new lua_value of type Number (decimal)
+     */
+    lua_value(lua_number);   // Float/Double
+    /**
+     * Create a new lua_value of type Object
+     */
     lua_value(object_store_ref);   // Obj (table, function)
+    /**
+     * Create a new lua_value of type String
+     */
     lua_value(const char *);   // String
 
+    /**
+     * Get the tag type of the value
+     */
     lua_tag_type get_tag_type() const;
+
+    /**
+     * Is this value nil?
+     */
     bool is_nil() const;
+
+    /**
+     * Is this value falsey? (Nil or False)
+     */
     bool is_falsey() const;
 
-    inline bool is_number() const {
+    /**
+     * Is this value numeric? (Integer or Decimal Number)
+     */
+    inline bool is_numeric() const {
       return data.is<lua_number>() || data.is<lua_integer>();
     }
 
+    /**
+     * Is this value an integer?
+     */
     inline bool is_integer() const { return data.is<lua_integer>(); }
+    /**
+     * Is this value a decimal? (Number)
+     */
     inline bool is_decimal() const { return data.is<lua_number>(); }
     
+    /**
+     * Is this value a boolean?
+     */
     inline bool is_bool() const { return data.is<bool>(); }
+    /**
+     * Is this value a string?
+     */
     inline bool is_string() const { return data.is<string_t>(); }
 
+    /**
+     * Is this value an object? (Table or Function)
+     */
     inline bool is_object() const { return data.is<object_store_ref>(); }
 
+    /**
+     * Get the value of this lua_value as an object.
+     */
     object_store_ref obj() const;
 
+    /**
+     * Convert this value to a number. Can convert a number, integer, or
+     * string.
+     * @param out The output number
+     * @return True if the value was successfully converted
+     */
     bool tonumber(lua_number &out) const;
+    /**
+     * Convert this value to an integer. Can convert a number, integer, or
+     * string.
+     * @param out The output integer
+     * @return True if the value was successfully converted
+     */
     bool tointeger(lua_integer &out) const;
+    /**
+     * Convert this value to a string. Can convert any lua type
+     * @param out The output string
+     * @return True if the value was successfully converted
+     */
     bool tostring(string_t &out) const;
 
+    /**
+     * Convert this value to a number, or 0 if the conversion was unsuccessful
+     * @return The number, or 0 if the conversion failed.
+     */
     inline lua_number tonumber() const {
       lua_number n = 0;
       tonumber(n);
       return n;
     }
 
+    /**
+     * Convert this value to an integer, or 0 if the conversion was unsuccessful
+     * @return The integer, or 0 if the conversion failed.
+     */
     inline lua_integer tointeger() const {
       lua_integer i = 0;
       tointeger(i);
       return i;
     }
 
+    /**
+     * Convert this value to a string, or "" (empty string) if the conversion was unsuccessful
+     * @return The number, or "" (empty string) if the conversion failed.
+     */
     inline string_t tostring() const {
       string_t s("");
       tostring(s);
@@ -173,6 +273,14 @@ namespace engine {
     bool operator<=(const lua_value &) const;
   };
 
+  /**
+   * A lua_table is the implementation of the Lua table datatype, allowing for a key-value store.
+   * Note that in Quokka, we implement this as an array of pairs, to save on memory.
+   * 
+   * Table keys are based on equality. For bool, integer, number, and string, this is based on the
+   * equality of the value. For objects (table, func), this is based on the instance of the value
+   * (the object itself).
+   */
   struct lua_table {
     struct node {
       lua_value key;
@@ -182,23 +290,44 @@ namespace engine {
     };
     small_vector<node, 16> entries;
 
-    lua_value get(const lua_value &) const;
-    void set(const lua_value &, const lua_value &);
+    /**
+     * Get a value from the table by key.
+     * 
+     * @param k The key of the entry
+     * @return The value of the entry
+     */
+    lua_value get(const lua_value &k) const;
+
+    /**
+     * Set a value in the table by key.
+     * 
+     * @param k The key of the entry
+     * @param v The value of the entry
+     */
+    void set(const lua_value &k, const lua_value &v);
   };
 
+  /**
+   * lua_lclosure is the implementation of a closure (function) implemented in Lua, including
+   * references to its upvals and bytecode prototype.
+   */
   struct lua_lclosure {
     bytecode_prototype *proto;
     small_vector<upval_ref, 4> upval_refs;
   };
 
+  /**
+   * lua_native_closure is the implementation of a closure (function) implemented in C++ (native).
+   * It is simply a function reference, either a C function or C++ function / lambda.
+   */
   struct lua_native_closure {
     using func_t = std::function<int(quokka_vm &)>;
     func_t func;
   };
 
   /**
-   * Lua objects are datatypes that are described by more than just their value. Unline
-   * numbers, strings, and booleans, objects can be complex, such as Tables. 
+   * Lua objects are datatypes that are described by more than just their value. Unlike
+   * numbers, strings, and booleans, objects can be complex, such as tables. 
    * 
    * In Quokka LE, objects are allocated into one large pool (analogous to the heap),
    * and automatically dealloced when their usages reach zero. Note that objects are distinct

@@ -62,13 +62,11 @@ void quokka_vm::call(size_t nargs, int nreturn) {
 }
 
 lua_value &quokka_vm::argument(int id) {
-  // If we're calling a function outright, there is no _callinfo, since this can also
-  // be used to get return vals.
   size_t idx = _callinfo.size() > 0 ? (_callinfo.last().func_idx + id + 1) : id;
   return _registers[idx];
 }
 
-int quokka_vm::num_params() {
+int quokka_vm::num_arguments() {
   return _registers.size() - (_callinfo.last().func_idx + 1);
 }
 

@@ -9,27 +9,58 @@ namespace engine {
 
 class small_vector_impl {
  public:
-  virtual void grow(size_t) = 0;
+  /**
+   * Chop this vector to a certain size, deallocating all elements
+   * after the chopped size.
+   */
   virtual void chop(size_t) = 0;
+  /**
+   * Is this vector on the stack?
+   */
   virtual bool is_stack() const = 0;
 
+  /**
+   * Reserve this vector to a certain size.
+   */
   void reserve(size_t size);
+  /**
+   * Clear this vector's elements
+   */
   void clear();
+  /**
+   * Get the size of the vector
+   */
   size_t size() const;
 
  protected:
+  /**
+   * Grow this vector up to a certain size.
+   */
+  virtual void grow(size_t) = 0;
+  
   size_t _size = 0;
 };
 
 template <typename T>
 class small_vector_base : public small_vector_impl {
  public:
+  /**
+   * Get the raw buffer for this vector. Note that this is invalidated
+   * when the vector is grown.
+   */
   virtual T* raw_buffer() const = 0;
 
+  /**
+   * Get a value at an index of the vector.
+   * Note that this does not perform bounds-checking.
+   */
   T& operator[](size_t pos) const {
     return raw_buffer()[pos];
   }
 
+  /**
+   * Get the last value of the vector.
+   */
   T& last() const {
     return raw_buffer()[_size - 1];
   }
@@ -56,11 +87,15 @@ class small_vector_base : public small_vector_impl {
 };
 
 /**
- * A vector that is stack-allocated up to a certain size, and is realloced
+ * A small_vector is a vector that is stack-allocated up to a certain size, and is realloced
  * onto the heap if it becomes larger than the stack size. 
  * 
  * This is particularly useful for avoiding memory fragmentation on small-memory
  * platforms (like embedded systems).
+ * 
+ * @param T The storage type of the vector
+ * @param STACK_SIZE The maximum size of the vector on the stack
+ * @param GROW_BY The size to grow the vector by when new elements are added
  */
 template <typename T, size_t STACK_SIZE, size_t GROW_BY=STACK_SIZE>
 class small_vector : public small_vector_base<T> {
@@ -85,6 +120,12 @@ class small_vector : public small_vector_base<T> {
     return *this;
   }
 
+  /**
+   * Emplace an element into this vector, at a certain index.
+   * This will grow the vector if necessary, and destruct any elements already
+   * present at the index.
+   * Forwards arguments to the constructor of the type T.
+   */
   template<class... Args>
   T& emplace(size_t pos, Args&&... args) {
     if (pos < this->_size) {
@@ -101,6 +142,11 @@ class small_vector : public small_vector_base<T> {
     return *place;
   }
 
+  /**
+   * Emplace an element into the end of this vector.
+   * This will grow the vector if necessary.
+   * Forwards arguments to the constructor of type T.
+   */
   template<class... Args>
   T& emplace_back(Args&&... args) {
     return emplace(this->_size, std::forward<Args>(args)...);
@@ -113,7 +159,7 @@ class small_vector : public small_vector_base<T> {
   }
 
  protected:
-  void grow(size_t next_size) {
+  void grow(size_t next_size) override {
     if (next_size > STACK_SIZE && next_size > _alloced_size) {
       T* new_buf = (T*)malloc(sizeof(T) * next_size);
       for (size_t i = 0; i < this->_size; i++)
@@ -133,8 +179,10 @@ class small_vector : public small_vector_base<T> {
   size_t _alloced_size = STACK_SIZE;
 };
 
-// A reference to a certain element in a small_vector, that is not invalidated
-// like a regular iterator when the vector changes internal layout.
+/**
+ * A continuous_reference is an iterator-like reference to an element in a small_vector, that does
+ * not invalidate when the vector is grown / reallocated.
+ */
 template<typename T>
 struct continuous_reference {
   small_vector_base<T> *vec;
@@ -143,10 +191,16 @@ struct continuous_reference {
   continuous_reference() : vec(nullptr) {}
   continuous_reference(small_vector_base<T> *v, size_t i) : vec(v), idx(i) {}
 
+  /**
+   * Get the pointer that this reference points to.
+   */
   T *operator*() const {
     return &vec->operator[](idx);
   }
 
+  /**
+   * Get the pointer that this reference points to.
+   */
   T* get() const {
     return &vec->operator[](idx);
   }
@@ -155,6 +209,9 @@ struct continuous_reference {
     return (vec == other.vec) && (idx == other.idx);
   }
 
+  /**
+   * Is this reference valid?
+   */
   bool is_valid() {
     return vec != nullptr;
   }

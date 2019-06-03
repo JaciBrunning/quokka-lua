@@ -72,7 +72,10 @@ namespace engine {
     inline static void destroy(size_t, char *) {}
   };
 
-  /* Variant impl */
+  /**
+   * simple_variant is a simple implementation of std::variant to provide a union of complex
+   * types, as std::variant is introduced in C++17.
+   */
   template <typename... T>
   struct simple_variant {
     using variant_func_t = variant_funcs<T...>;
@@ -121,6 +124,9 @@ namespace engine {
       return *this;
     }
 
+    /**
+     * Set the value of the variant, forwarding arguments to the constructor.
+     */
     template <typename U, typename... Args, typename = typename std::enable_if<type_in<U, T...>::value>::type>
     U& emplace(Args &&... args) {
       variant_func_t::destroy(_type_id, &_data_raw[0]);
@@ -129,21 +135,39 @@ namespace engine {
       return get<U>();
     }
 
+    /**
+     * Clear the value of the variant.
+     */
     void unassign() {
       variant_func_t::destroy(_type_id, &_data_raw[0]);
       _type_id = typeid(void).hash_code();
     }
 
+    /**
+     * Get the value of the variant, given the expected type.
+     * Check with `is<U>()` first, as this does not perform any type checking.
+     * @param U The type
+     * @return A reference to the data of the variant, as type U.
+     */
     template <typename U, typename = typename std::enable_if<type_in<U, T...>::value>::type>
     U &get() const {
       return *reinterpret_cast<U *>((char *)&_data_raw[0]);
     }
 
+    /**
+     * Check if this variant is of type U.
+     * @param U the type to check
+     * @return True if the variant data is of type U.
+     */
     template <typename U>
     bool is() const {
       return (_type_id == typeid(U).hash_code());
     }
 
+    /**
+     * Check if this variant is assigned.
+     * @return True if this variant is assigned (has data).
+     */
     bool is_assigned() const { return (_type_id != typeid(void).hash_code()); }
   };
 }  // namespace engine

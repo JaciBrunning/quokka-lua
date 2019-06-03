@@ -12,8 +12,14 @@ namespace engine {
   #define CALL_STATUS_FRESH (1 << 3)
   #define CALL_STATUS_TAIL (1 << 5)
 
+  /**
+   * Magic value for a nreturn with variable returns.
+   */
   const int MULTIRET = -1;
 
+  /**
+   * Structure defining a call (stack frame) of a closure.
+   */
   struct lua_call {
     // Index of the function in the stack
     size_t func_idx;
@@ -26,41 +32,120 @@ namespace engine {
       struct { } native;
     } info;
     // How many results (return vals) from this function?
-    int numresults = 0; // TODO: Check negatives
+    int numresults = 0;
     unsigned callstatus = 0;
   };
 
-  // Our equivilent of lua_state
+  /**
+   * The Quokka VM is the runtime of the Quokka Lua Engine. It is responsible
+   * for interpreting bytecode instructions, and storing all data related to the
+   * runtime. 
+   */
   class quokka_vm {
    public:
+    /**
+     * Construct a Quokka VM without loading any bytecode.
+     */
     quokka_vm();
+
+    /**
+     * Construct a Quokka VM and load a bytecode chunk (root prototype).
+     * @param bc The bytecode to load
+     */
     quokka_vm(bytecode_chunk &bc) : quokka_vm() {
       load(bc);
     }
     
-    void load(bytecode_chunk &);
+    /**
+     * Load some bytecode into the VM. This should only be done if using the default
+     * constructor, or if a call to the root function has been completed.
+     * @param bc The bytecode to load
+     */
+    void load(bytecode_chunk &bc);
 
     object_store_ref alloc_object();
     upval_ref alloc_upval();
 
     /**
-     * Call a function that has its closure on the register stack already
+     * Call a function on the stack.
+     * 
+     * In preparation for calling the function, the closure value shall
+     * be pushed onto the stack (unless preceeded by load()).
+     * Any required arguments should be pushed onto the stack using push().
+     * After the function is called, its return values can be retrieved using pop().
+     * 
+     * @param nargs The number of arguments to the function. Default 0
+     * @param nreturn The number of return values from the function. Default 0
      */
     void call(size_t nargs = 0, int nreturn = 0);
 
-    // To be called from within a called function
-    // Gets a local variable passed to a function. ID starts from 1
+    /**
+     * Gets an argument given to a native function.
+     * @param id The id of the argument, indexed from 0
+     * @return The value of the argument
+     */
     lua_value &argument(int id);
-    int num_params();
+
+    /**
+     * Get the number of arguments provided to a native function.
+     * @return The number of arguments (params)
+     */
+    int num_arguments();
+
+    /**
+     * Push a value onto the stack, in preparation for calling a function.
+     * @param v The value to push onto the stack.
+     */
     void push(const lua_value &v);
+
+    /**
+     * Push a value from the global environment onto the stack. Shorthand for
+     * push(env().get(key)).
+     * @param key The name of the global variable.
+     */
     void push_global(const lua_value &key) {
       push(env().get(key));
     }
+
+    /**
+     * Pop a value off of the top of the stack, retrieving it's value. Most
+     * commonly used for fetching return values. 
+     * 
+     * Note that, if used for getting return values, return values are popped
+     * in reverse order.
+     * 
+     * @return The value at the top of the stack.
+     */
     lua_value &pop();
+
+    /**
+     * Pop a number of arguments from the stack, disregarding their value, primarily
+     * used for ignoring return values.
+     * 
+     * @param num The number of values to pop.
+     */
     void pop(size_t num);
 
+    /**
+     * Get the 'distinguished environment', also known as the Global Table, where all
+     * global variables are stored. The distinguished env is created automatically when
+     * the VM is created, and this can be used for assigning or retrieving global variables.
+     */
     lua_table &env();
+
+    /**
+     * Allocate a native function, ready to be put into the global env or other lua_value.
+     * This is a quick way to define a new native function.
+     */
     object_store_ref alloc_native_function(lua_native_closure::func_t f);
+
+    /**
+     * Define a native function, placed into the global env. This is a shortcut
+     * for env().set(key, alloc_native_function(f)).
+     * 
+     * @param key The key of the native function in the global env (see env())
+     * @param f The native function, as a lambda, C function, or other std::function type.
+     */
     void define_native_function(const lua_value &key, lua_native_closure::func_t f);
     
    private:
