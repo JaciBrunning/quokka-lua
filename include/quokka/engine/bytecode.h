@@ -80,6 +80,11 @@ class bytecode_reader {
   bytecode_reader(std::istream &stream);
 
   void read_chunk(bytecode_chunk &);
+  bytecode_chunk read_chunk() {
+    bytecode_chunk c;
+    read_chunk(c);
+    return c;
+  }
 
   void read_header(bytecode_header &);
   void read_function(bytecode_architecture, bytecode_prototype &);

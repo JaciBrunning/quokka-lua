@@ -24,9 +24,7 @@ int main() {
   bytecode_reader reader(bytecode_file);
 
   // Read a Lua program and load it into the VM.
-  bytecode_chunk lua_program;
-  reader.read_chunk(lua_program);
-
+  bytecode_chunk lua_program = reader.read_chunk();
   quokka_vm v(lua_program);
 
   // Define a C++ function, making it available to the Lua program

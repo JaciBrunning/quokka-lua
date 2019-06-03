@@ -9,9 +9,7 @@ int main() {
   std::ifstream bytecode_in("luac.out");
   bytecode_reader reader(bytecode_in);
 
-  bytecode_chunk chunk;
-  reader.read_chunk(chunk);
-
+  bytecode_chunk chunk = reader.read_chunk();
   quokka_vm v(chunk);
 
   v.define_native_function("print", [](quokka_vm &v) {
