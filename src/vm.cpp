@@ -453,7 +453,10 @@ void quokka_vm::execute() {
       }
       case opcode::OP_CONCAT: {
         // R(A) = R(B) .. .. R(C)
-        // TODO:
+        if (ra != base + arg_b)
+          _registers.emplace(ra, _registers[base + arg_b]);
+        for (size_t i = base + arg_b + 1; i <= base + arg_c; i++)
+          _registers[ra].data.get<tvalue::string_t>().concat_str(_registers[i].tostring());
         break;
       }
       case opcode::OP_JMP: {

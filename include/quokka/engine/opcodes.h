@@ -1,7 +1,5 @@
 #pragma once
 
-#include "types.h"
-
 namespace quokka {
 namespace engine {
 // Directly taken from lopcodes.h in the Lua source

@@ -5,3 +5,11 @@ print(true)
 print(nil)
 print(print)
 print(_ENV)
+
+a = "test"
+b = 123
+c = "world"
+
+d = a .. b .. c
+print(a)
+print(d)
