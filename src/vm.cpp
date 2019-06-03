@@ -7,10 +7,8 @@ using namespace jaci::robotlua;
 
 vm::vm() {
   // Load distinguished env.
-  _distinguished_env.tag_type = construct_tag_type(tag::TABLE);
   object_store_ref objstore = alloc_object();
   (*objstore)->table();
-  // _distinguished_env = tvalue(objstore);
   _distinguished_env = tvalue(objstore);
 }
 

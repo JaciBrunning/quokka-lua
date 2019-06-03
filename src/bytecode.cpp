@@ -151,15 +151,17 @@ void bytecode_reader::read_function(bytecode_architecture arch, bytecode_prototy
   func.num_constants = read_native_int(arch);
   for (int i = 0; i < func.num_constants; i++) {
     uint8_t type_tag = read_byte();
-    tag t = get_tag_from_tag_type(type_tag);
-    if (t == tag::BOOL) {
+    lua_tag_type ltt = trunc_tag_type(type_tag);
+    if (ltt == lua_tag_type::BOOL) {
       func.constants.emplace_back((bool)read_byte());
-    } else if (type_tag == construct_tag_type(tag::NUMBER, variant::NUM_FLOAT)) {
+    } else if (type_tag == 3) {
+      /* NUM_FLOAT */
       func.constants.emplace_back(read_lua_number(arch));
-    } else if (type_tag == construct_tag_type(tag::NUMBER, variant::NUM_INT)) {
+    } else if (type_tag == 19) {
+      /* NUM_INTEGER */
       func.constants.emplace_back(read_lua_integer(arch));
-    } else if (t == tag::STRING) {
-      tvalue &val = func.constants.emplace_back(type_tag);
+    } else if (ltt == lua_tag_type::STRING) {
+      tvalue &val = func.constants.emplace_back("");
       // read_lua_string(*this, arch, *val.value_string());
       read_lua_string(*this, arch, val.data.get<tvalue::string_vec>());
     }
@@ -329,15 +331,19 @@ void bytecode_writer::write_function(bytecode_prototype &func) {
   for (int i = 0; i < func.num_constants; i++) {
     tvalue &tv = func.constants[i];
     // TODO: this needs to be sanitized according to ldump.c
-    write_byte(tv.tag_type);
-    tag t = get_tag_from_tag_type(tv.tag_type);
-    if (t == tag::BOOL) {
+    uint8_t tag_type = (uint8_t)tv.get_tag_type();
+    // Special case - Tag type 3 (number) is 19 for integers.
+    if (tv.data.is<lua_integer>()) tag_type = 19;
+    write_byte(tag_type);
+    lua_tag_type t = tv.get_tag_type();
+    if (t == lua_tag_type::BOOL) {
       write_byte(tv.data.get<bool>() ? 1 : 0);
-    } else if (tv.tag_type == construct_tag_type(tag::NUMBER, variant::NUM_FLOAT)) {
-      write_lua_number(tv.data.get<lua_number>());
-    } else if (tv.tag_type == construct_tag_type(tag::NUMBER, variant::NUM_INT)) {
-      write_lua_integer(tv.data.get<lua_integer>());
-    } else if (t == tag::STRING) {
+    } else if (t == lua_tag_type::NUMBER) {
+      if (tv.data.is<lua_integer>())
+        write_lua_integer(tv.data.get<lua_integer>());
+      else
+        write_lua_number(tv.data.get<lua_number>());
+    } else if (t == lua_tag_type::STRING) {
       write_lua_string(*this, tv.data.get<tvalue::string_vec>());
     }
   }

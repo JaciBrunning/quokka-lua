@@ -18,12 +18,13 @@ void refcountable::unuse() {
   }
 }
 
-lua_object::lua_object() : tag_type(construct_tag_type(tag::NIL)) { }
+lua_object::lua_object() {
+  data.unassign();
+}
 
 lua_table &lua_object::table() {
   if (data.is<lua_table>())
     return data.get<lua_table>();
-  tag_type = construct_tag_type(tag::TABLE);
   return data.emplace<lua_table>();
 }
 
@@ -31,7 +32,6 @@ lua_lclosure &lua_object::lclosure() {
   if (data.is<lua_lclosure>())
     return data.get<lua_lclosure>();
 
-  tag_type = construct_tag_type(tag::FUNC, variant::FUNC_LUA);
   return data.emplace<lua_lclosure>();
 }
 
@@ -39,49 +39,59 @@ lua_native_closure &lua_object::native_closure() {
   if (data.is<lua_native_closure>())
     return data.get<lua_native_closure>();
 
-  tag_type = construct_tag_type(tag::FUNC, variant::FUNC_C);
   return data.emplace<lua_native_closure>();
+}
+
+lua_tag_type lua_object::get_tag_type() const {
+  if (!data.is_assigned())
+    return lua_tag_type::NIL;
+  if (data.is<lua_table>())
+    return lua_tag_type::TABLE;
+  return lua_tag_type::FUNC;
 }
 
 void lua_object::on_refcount_zero() {
   data.unassign();
 }
 
-tvalue::tvalue() : tag_type(construct_tag_type(tag::NIL)) {}
+tvalue::tvalue() {
+  data.unassign();
+}
 
-tvalue::tvalue(bool b) : tag_type(construct_tag_type(tag::BOOL)) {
+tvalue::tvalue(bool b) {
   data.emplace<bool>(b);
 }
 
-tvalue::tvalue(lua_integer i) : tag_type(construct_tag_type(tag::NUMBER, variant::NUM_INT)) {
+tvalue::tvalue(lua_integer i) {
   data.emplace<lua_integer>(i);
 }
 
-tvalue::tvalue(lua_number n) : tag_type(construct_tag_type(tag::NUMBER, variant::NUM_FLOAT)) {
+tvalue::tvalue(lua_number n) {
   data.emplace<lua_number>(n);
 }
 
 tvalue::tvalue(object_store_ref ref) {
-  tag_type = (*ref)->tag_type;
   data.emplace<object_store_ref>(ref);
 }
 
-tvalue::tvalue(uint8_t tagt) : tag_type(tagt) {
-  tag t = get_tag_from_tag_type(tagt);
-  //variant v = get_variant_from_tag_type(tagt);
-  if (t == tag::STRING) {
-    data.emplace<string_vec>();
-  } else {
-    // TODO: Error
-  }
-}
-
-tvalue::tvalue(const char *s) : tag_type(construct_tag_type(tag::STRING)) {
+tvalue::tvalue(const char *s) {
   data.emplace<string_vec>(s);
 }
 
+lua_tag_type tvalue::get_tag_type() const {
+  if (!data.is_assigned()) return lua_tag_type::NIL;
+  if (data.is<bool>())
+    return lua_tag_type::BOOL;
+  if (data.is<lua_number>() || data.is<lua_integer>())
+    return lua_tag_type::NUMBER;
+  if (data.is<tvalue::string_vec>())
+    return lua_tag_type::STRING;
+  // Is object
+  return data.get<object_store_ref>().get()->get_tag_type();
+}
+
 bool tvalue::is_nil() {
-  return get_tag_from_tag_type(tag_type) == tag::NIL;
+  return !data.is_assigned();
 }
 
 bool tvalue::is_falsey() {
@@ -97,9 +107,9 @@ tvalue::string_vec &tvalue::str() {
 }
 
 bool tvalue::operator==(const tvalue &other) const {
-  if (tag_type != other.tag_type) return false;
+  if (get_tag_type() != other.get_tag_type()) return false;
   // nil has no data
-  if (get_tag_from_tag_type(tag_type) != tag::NIL) {
+  if (get_tag_type() != lua_tag_type::NIL) {
     if (data.is<bool>())
       return data.get<bool>() == other.data.get<bool>();
     else if (data.is<lua_number>())
@@ -123,7 +133,7 @@ bool tvalue::operator==(const tvalue &other) const {
 }
 
 bool tvalue::operator<(const tvalue &other) const {
-  if (get_tag_from_tag_type(tag_type) == get_tag_from_tag_type(other.tag_type)) {
+  if (get_tag_type() == other.get_tag_type()) {
     lua_number na, nb;
     if (conv::tonumber((tvalue &)*this, na) && conv::tonumber((tvalue &)other, nb)) {
       return na < nb;
@@ -136,7 +146,7 @@ bool tvalue::operator<(const tvalue &other) const {
 }
 
 bool tvalue::operator<=(const tvalue &other) const {
-  if (get_tag_from_tag_type(tag_type) == get_tag_from_tag_type(other.tag_type)) {
+  if (get_tag_type() == other.get_tag_type()) {
     lua_number na, nb;
     if (conv::tonumber((tvalue &)*this, na) && conv::tonumber((tvalue &)other, nb)) {
       return na <= nb;

@@ -13,38 +13,21 @@ namespace robotlua {
   using lua_integer     = int;
   using lua_number      = double;
 
-  enum class tag {
-    NIL             = 0,
-    BOOL            = 1,
-    LIGHT_USER_DATA = 2,
-    NUMBER          = 3,
-    STRING          = 4,
-    TABLE           = 5,
-    FUNC            = 6,
-    USER_DATA       = 7,
-    THREAD          = 8
+  enum class lua_tag_type {
+    NIL = 0,
+    BOOL = 1, 
+    // light_user_data ignored
+    NUMBER = 3, // Note: internally, NUMBER can be either a float or an integer internally. See tvalue for info.
+    STRING = 4,
+    TABLE = 5,
+    FUNC = 6    // Note: internally, FUNC can be either a Lua closure or a Native closure. See lua_object for info.
+    // user_data and thread ignored
   };
 
-  enum class variant {
-    NONE         = 0,
-    /* Number */
-    NUM_FLOAT    = 0,
-    NUM_INT      = 1,
-    /* String */
-    STR_SHORT    = 0,
-    STR_LONG     = 1,  // NOTE: RobotLua does not differentiate between Long and Short strings.
-    /* Function */
-    FUNC_LUA     = 0,
-    FUNC_C       = 2   // NOTE: In RobotLua, every C function is a light C function.
-  };
-
-  inline uint8_t construct_tag_type(tag t, variant v = variant::NONE) {
-    return (uint8_t)t | ((uint8_t)v << 4);
-  }
-
-  inline tag get_tag_from_tag_type(uint8_t tag_type) { return (tag)(tag_type & 0x0F); }
-  inline variant get_variant_from_tag_type(uint8_t tag_type) {
-    return (variant)(tag_type >> 4);
+  // Tag types in bytecode have variant information. We don't actually care about that, since we use simplevariant,
+  // so we ignore it.
+  inline lua_tag_type trunc_tag_type(uint8_t bc_tagtype) {
+    return (lua_tag_type)(bc_tagtype & 0x0F);
   }
 
   struct lua_object;
@@ -105,7 +88,6 @@ namespace robotlua {
   struct tvalue {
     using string_vec = small_string<32>;
 
-    uint8_t tag_type;
     /**
      * no type: Nil
      * bool: Boolean
@@ -121,12 +103,12 @@ namespace robotlua {
     tvalue(lua_integer);  // Int
     tvalue(lua_number);   // Float
     tvalue(object_store_ref);   // Obj (table, function)
+    tvalue(const char *);   // String
 
-    tvalue(uint8_t tagt);  // String
-    tvalue(const char *);   // Also string
-
+    lua_tag_type get_tag_type() const;
     bool is_nil();
     bool is_falsey();
+
     object_store_ref obj();
     string_vec &str();
 
@@ -170,7 +152,6 @@ namespace robotlua {
    * A value may hold an object (or rather, a reference to an object), but an object is not a value.
    */
   struct lua_object : public refcountable {
-    uint8_t tag_type;
     simple_variant<lua_table, lua_lclosure, lua_native_closure> data;
 
     lua_object();
@@ -178,6 +159,8 @@ namespace robotlua {
     lua_table &table();
     lua_lclosure &lclosure();
     lua_native_closure &native_closure();
+
+    lua_tag_type get_tag_type() const;
 
     void on_refcount_zero() override;
   };
@@ -223,6 +206,7 @@ namespace robotlua {
     void on_refcount_zero() override;
   };
 
+  // TODO: Move to tvalue
   namespace conv {
     inline bool tonumber(tvalue &src, lua_number &out) {
       if (src.data.is<lua_number>()) {
