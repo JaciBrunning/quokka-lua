@@ -163,7 +163,7 @@ void bytecode_reader::read_function(bytecode_architecture arch, bytecode_prototy
     } else if (ltt == lua_tag_type::STRING) {
       tvalue &val = func.constants.emplace_back("");
       // read_lua_string(*this, arch, *val.value_string());
-      read_lua_string(*this, arch, val.data.get<tvalue::string_vec>());
+      read_lua_string(*this, arch, val.data.get<tvalue::string_t>());
     }
   }
 
@@ -344,7 +344,7 @@ void bytecode_writer::write_function(bytecode_prototype &func) {
       else
         write_lua_number(tv.data.get<lua_number>());
     } else if (t == lua_tag_type::STRING) {
-      write_lua_string(*this, tv.data.get<tvalue::string_vec>());
+      write_lua_string(*this, tv.data.get<tvalue::string_t>());
     }
   }
 

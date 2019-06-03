@@ -86,17 +86,17 @@ namespace robotlua {
   class vm;
 
   struct tvalue {
-    using string_vec = small_string<32>;
+    using string_t = small_string<32>;
 
     /**
      * no type: Nil
      * bool: Boolean
      * lua_number: Number (float)
      * lua_integer: Number (integer)
-     * string_vec: String
+     * string_t: String
      * object_store_ref: Ref to lua_object in object store
      */
-    simple_variant<bool, lua_number, lua_integer, string_vec, object_store_ref> data;
+    simple_variant<bool, lua_number, lua_integer, string_t, object_store_ref> data;
 
     tvalue();             // Nil
     tvalue(bool);         // Bool
@@ -106,11 +106,15 @@ namespace robotlua {
     tvalue(const char *);   // String
 
     lua_tag_type get_tag_type() const;
-    bool is_nil();
-    bool is_falsey();
+    bool is_nil() const;
+    bool is_falsey() const;
 
-    object_store_ref obj();
-    string_vec &str();
+    object_store_ref obj() const;
+
+    bool tonumber(lua_number &out) const;
+    lua_number tonumber() const;
+    bool tointeger(lua_integer &out) const;
+    lua_integer tointeger() const;
 
     bool operator==(const tvalue &) const;
     bool operator<(const tvalue &) const;
@@ -205,51 +209,5 @@ namespace robotlua {
 
     void on_refcount_zero() override;
   };
-
-  // TODO: Move to tvalue
-  namespace conv {
-    inline bool tonumber(tvalue &src, lua_number &out) {
-      if (src.data.is<lua_number>()) {
-        out = src.data.get<lua_number>();
-        return true;
-      } else if (src.data.is<lua_integer>()) {
-        out = (lua_number) src.data.get<lua_integer>();
-        return true;
-      } else if (src.data.is<tvalue::string_vec>()) {
-        // Try to parse string
-        char *end;
-        lua_number n = strtod(src.data.get<tvalue::string_vec>().c_str(), &end);
-        if (*end != '\0')
-          return false;
-        out = n;
-        return true;
-      }
-      return false;
-    }
-
-    inline lua_number tonumber2(tvalue &t) {
-      lua_number n = 0;
-      tonumber(t, n);
-      return n;
-    }
-
-    inline bool tointeger(tvalue &src, lua_integer &out) {
-      lua_number n;
-      if (src.data.is<lua_integer>()) {
-        out = src.data.get<lua_integer>();
-        return true;
-      } else if (tonumber(src, n)) {
-        // Safe for doubles to be converted to int
-        if (n < std::numeric_limits<lua_integer>::lowest())
-          out = std::numeric_limits<lua_integer>::lowest();
-        else if (n > std::numeric_limits<lua_integer>::max())
-          out = std::numeric_limits<lua_integer>::max();
-        else
-          out = (lua_integer) n;
-        return true;
-      }
-      return false;
-    }
-  }
 }  // namespace robotlua
 }  // namespace jaci

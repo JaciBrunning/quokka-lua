@@ -281,7 +281,7 @@ void vm::execute() {
         if (nb.data.is<lua_integer>() && nc.data.is<lua_integer>()) {
           lua_integer result = nb.data.get<lua_integer>() + nc.data.get<lua_integer>();
           _registers.emplace(ra, result);
-        } else if (conv::tonumber(nb, lnb) && conv::tonumber(nc, lnc)) {
+        } else if (nb.tonumber(lnb) && nc.tonumber(lnc)) {
           _registers.emplace(ra, lnb + lnc);
         }
         break;
@@ -294,7 +294,7 @@ void vm::execute() {
         if (nb.data.is<lua_integer>() && nc.data.is<lua_integer>()) {
           lua_integer result = nb.data.get<lua_integer>() - nc.data.get<lua_integer>();
           _registers.emplace(ra, result);
-        } else if (conv::tonumber(nb, lnb) && conv::tonumber(nc, lnc)) {
+        } else if (nb.tonumber(lnb) && nc.tonumber(lnc)) {
           _registers.emplace(ra, lnb - lnc);
         }
         break;
@@ -307,7 +307,7 @@ void vm::execute() {
         if (nb.data.is<lua_integer>() && nc.data.is<lua_integer>()) {
           lua_integer result = nb.data.get<lua_integer>() * nc.data.get<lua_integer>();
           _registers.emplace(ra, result);
-        } else if (conv::tonumber(nb, lnb) && conv::tonumber(nc, lnc)) {
+        } else if (nb.tonumber(lnb) && nc.tonumber(lnc)) {
           _registers.emplace(ra, lnb * lnc);
         }
         break;
@@ -320,7 +320,7 @@ void vm::execute() {
         if (nb.data.is<lua_integer>() && nc.data.is<lua_integer>()) {
           lua_integer result = nb.data.get<lua_integer>() % nc.data.get<lua_integer>();
           _registers.emplace(ra, result);
-        } else if (conv::tonumber(nb, lnb) && conv::tonumber(nc, lnc)) {
+        } else if (nb.tonumber(lnb) && nc.tonumber(lnc)) {
           _registers.emplace(ra, fmod(lnb, lnc));
         }
         break;
@@ -330,7 +330,7 @@ void vm::execute() {
         tvalue &nb = RL_VM_RK(arg_b);
         tvalue &nc = RL_VM_RK(arg_c);
         lua_number lnb, lnc;
-        if (conv::tonumber(nb, lnb) && conv::tonumber(nc, lnc)) {
+        if (nb.tonumber(lnb) && nc.tonumber(lnc)) {
           _registers.emplace(ra, pow(lnb, lnc));
         }
         break;
@@ -343,7 +343,7 @@ void vm::execute() {
         if (nb.data.is<lua_integer>() && nc.data.is<lua_integer>()) {
           lua_integer result = nb.data.get<lua_integer>() / nc.data.get<lua_integer>();
           _registers.emplace(ra, result);
-        } else if (conv::tonumber(nb, lnb) && conv::tonumber(nc, lnc)) {
+        } else if (nb.tonumber(lnb) && nc.tonumber(lnc)) {
           _registers.emplace(ra, lnb / lnc);
         }
         break;
@@ -356,7 +356,7 @@ void vm::execute() {
         if (nb.data.is<lua_integer>() && nc.data.is<lua_integer>()) {
           lua_integer result = nb.data.get<lua_integer>() / nc.data.get<lua_integer>();
           _registers.emplace(ra, result);
-        } else if (conv::tonumber(nb, lnb) && conv::tonumber(nc, lnc)) {
+        } else if (nb.tonumber(lnb) && nc.tonumber(lnc)) {
           _registers.emplace(ra, (lua_integer)(lnb / lnc));
         }
         break;
@@ -417,7 +417,7 @@ void vm::execute() {
         lua_number ln;
         if (n.data.is<lua_integer>()) {
           _registers.emplace(ra, -n.data.get<lua_integer>());
-        } else if (conv::tonumber(n, ln)) {
+        } else if (n.tonumber(ln)) {
           _registers.emplace(ra, -ln);
         }
         break;
@@ -426,7 +426,7 @@ void vm::execute() {
         // R(A) = ~R(B)
         tvalue &n = _registers[base + opcode_util::val(arg_b)];
         lua_integer li;
-        if (conv::tointeger(n, li)) {
+        if (n.tointeger(li)) {
           // _registers[ra] = ~li;
           _registers.emplace(ra, ~li);
         }
@@ -441,8 +441,8 @@ void vm::execute() {
       case opcode::OP_LEN: {
         // R(A) = length of R(B)
         tvalue &n = _registers[base + opcode_util::val(arg_b)];
-        if (n.data.is<tvalue::string_vec>()) {
-          _registers.emplace(ra, (lua_integer) n.data.get<tvalue::string_vec>().size());
+        if (n.data.is<tvalue::string_t>()) {
+          _registers.emplace(ra, (lua_integer) n.data.get<tvalue::string_t>().size());
         } else if (n.data.is<object_store_ref>()) {
           object_store_ref o = n.obj();
           if (o.get()->data.is<lua_table>()) {
@@ -591,7 +591,7 @@ void vm::execute() {
         tvalue &step = _registers[ra + 2];
 
         lua_integer int_limit;
-        bool valid_int_limit = conv::tointeger(limit, int_limit);
+        bool valid_int_limit = limit.tointeger(int_limit);
 
         if (init.data.is<lua_integer>() && step.data.is<lua_integer>() && valid_int_limit) {
           lua_integer istep = step.data.get<lua_integer>();
@@ -602,9 +602,9 @@ void vm::execute() {
         } else {
           // Try making everything a float
           lua_number nlimit, ninit, nstep;
-          if (!conv::tonumber(init, ninit)) {}
-          if (!conv::tonumber(limit, nlimit)) {}
-          if (!conv::tonumber(step, nstep)) {}
+          if (!init.tonumber(ninit)) {}
+          if (!limit.tonumber(nlimit)) {}
+          if (!step.tonumber(nstep)) {}
           // TODO: Error if number conversion fails
           limit.data.emplace<lua_number>(nlimit);
           init.data.emplace<lua_number>(ninit - nstep);

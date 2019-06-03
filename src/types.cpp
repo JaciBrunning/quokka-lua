@@ -75,7 +75,7 @@ tvalue::tvalue(object_store_ref ref) {
 }
 
 tvalue::tvalue(const char *s) {
-  data.emplace<string_vec>(s);
+  data.emplace<string_t>(s);
 }
 
 lua_tag_type tvalue::get_tag_type() const {
@@ -84,26 +84,71 @@ lua_tag_type tvalue::get_tag_type() const {
     return lua_tag_type::BOOL;
   if (data.is<lua_number>() || data.is<lua_integer>())
     return lua_tag_type::NUMBER;
-  if (data.is<tvalue::string_vec>())
+  if (data.is<tvalue::string_t>())
     return lua_tag_type::STRING;
   // Is object
   return data.get<object_store_ref>().get()->get_tag_type();
 }
 
-bool tvalue::is_nil() {
+bool tvalue::is_nil() const {
   return !data.is_assigned();
 }
 
-bool tvalue::is_falsey() {
+bool tvalue::is_falsey() const {
   return is_nil() || (data.is<bool>() && !data.get<bool>());
 }
 
-object_store_ref tvalue::obj() {
+object_store_ref tvalue::obj() const {
   return data.get<object_store_ref>();
 }
 
-tvalue::string_vec &tvalue::str() {
-  return data.get<string_vec>();
+bool tvalue::tonumber(lua_number &out) const {
+  if (data.is<lua_number>()) {
+    out = data.get<lua_number>();
+    return true;
+  } else if (data.is<lua_integer>()) {
+    out = (lua_number) data.get<lua_integer>();
+    return true;
+  } else if (data.is<tvalue::string_t>()) {
+    // Try to parse string
+    char *end;
+    lua_number n = strtod(data.get<tvalue::string_t>().c_str(), &end);
+    if (*end != '\0')
+      return false;
+    out = n;
+    return true;
+  }
+  return false;
+}
+
+lua_number tvalue::tonumber() const {
+  lua_number n = 0;
+  tonumber(n);
+  return n;
+}
+
+bool tvalue::tointeger(lua_integer &out) const {
+  lua_number n;
+  if (data.is<lua_integer>()) {
+    out = data.get<lua_integer>();
+    return true;
+  } else if (tonumber(n)) {
+    // Safe for doubles to be converted to int
+    if (n < std::numeric_limits<lua_integer>::lowest())
+      out = std::numeric_limits<lua_integer>::lowest();
+    else if (n > std::numeric_limits<lua_integer>::max())
+      out = std::numeric_limits<lua_integer>::max();
+    else
+      out = (lua_integer) n;
+    return true;
+  }
+  return false;
+}
+
+lua_integer tvalue::tointeger() const {
+  lua_integer i = 0;
+  tointeger(i);
+  return i;
 }
 
 bool tvalue::operator==(const tvalue &other) const {
@@ -116,9 +161,9 @@ bool tvalue::operator==(const tvalue &other) const {
       return data.get<lua_number>() == other.data.get<lua_number>();
     else if (data.is<lua_integer>())
       return data.get<lua_integer>() == other.data.get<lua_integer>();
-    else if (data.is<string_vec>()) {
+    else if (data.is<string_t>()) {
       // Compare string values
-      string_vec &a = data.get<string_vec>(), &b = other.data.get<string_vec>();
+      string_t &a = data.get<string_t>(), &b = other.data.get<string_t>();
       if (a.length() != b.length()) return false;
       for (size_t i = 0; i < a.length(); i++)
         if (a[i] != b[i])
@@ -135,10 +180,10 @@ bool tvalue::operator==(const tvalue &other) const {
 bool tvalue::operator<(const tvalue &other) const {
   if (get_tag_type() == other.get_tag_type()) {
     lua_number na, nb;
-    if (conv::tonumber((tvalue &)*this, na) && conv::tonumber((tvalue &)other, nb)) {
+    if (this->tonumber(na) && other.tonumber(nb)) {
       return na < nb;
-    } else if (data.is<string_vec>()) {
-      int strc = strcmp(data.get<string_vec>().c_str(), other.data.get<string_vec>().c_str());
+    } else if (data.is<string_t>()) {
+      int strc = strcmp(data.get<string_t>().c_str(), other.data.get<string_t>().c_str());
       return strc < 0;
     }
   }
@@ -148,10 +193,10 @@ bool tvalue::operator<(const tvalue &other) const {
 bool tvalue::operator<=(const tvalue &other) const {
   if (get_tag_type() == other.get_tag_type()) {
     lua_number na, nb;
-    if (conv::tonumber((tvalue &)*this, na) && conv::tonumber((tvalue &)other, nb)) {
+    if (this->tonumber(na) && other.tonumber(nb)) {
       return na <= nb;
-    } else if (data.is<string_vec>()) {
-      int strc = strcmp(data.get<string_vec>().c_str(), other.data.get<string_vec>().c_str());
+    } else if (data.is<string_t>()) {
+      int strc = strcmp(data.get<string_t>().c_str(), other.data.get<string_t>().c_str());
       return strc <= 0;
     }
   }

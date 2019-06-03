@@ -17,10 +17,10 @@ int main() {
 
   v.define_native_function("print", [](vm &v) {
     tvalue &a = v.argument(0);
-    if (a.data.is<tvalue::string_vec>())
-      std::cout << a.data.get<tvalue::string_vec>().c_str() << std::endl;
+    if (a.data.is<tvalue::string_t>())
+      std::cout << a.data.get<tvalue::string_t>().c_str() << std::endl;
     else
-      std::cout << conv::tonumber2(a) << std::endl;
+      std::cout << a.tonumber() << std::endl;
     return 0;
   });
 
@@ -29,7 +29,7 @@ int main() {
   v.push(v.env().get("test"));
   v.push(123);
   v.call(1, 2);
-  std::cout << conv::tonumber2(v.argument(0)) << " " << conv::tonumber2(v.argument(1)) << std::endl;
+  std::cout << v.argument(0).tonumber() << " " << v.argument(1).tonumber() << std::endl;
   v.pop(2);
 
   return 0;
