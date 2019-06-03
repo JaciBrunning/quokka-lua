@@ -53,6 +53,9 @@ namespace engine {
     tvalue &argument(int id);
     int num_params();
     void push(const tvalue &v);
+    void push_global(const tvalue &key) {
+      push(env().get(key));
+    }
     tvalue &pop();
     void pop(size_t num);
 

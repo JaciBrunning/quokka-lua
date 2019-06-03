@@ -19,7 +19,7 @@ int main() {
 
   v.call();
 
-  // v.push(v.env().get("test"));
+  // v.push_global("test");
   // v.push(123);
   // v.call(1, 2);
   // std::cout << v.argument(0).tonumber() << " " << v.argument(1).tonumber() << std::endl;
