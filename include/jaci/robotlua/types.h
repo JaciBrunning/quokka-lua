@@ -102,20 +102,6 @@ namespace robotlua {
   // Note: fwd declaration of vm in vm.h (needed by lua_native_closure funcdec)
   class vm;
 
-  struct lua_lclosure {
-    bytecode_prototype *proto;
-    small_vector<upval_ref, 4> upval_refs;
-  };
-
-  struct lua_native_closure {
-    using func_t = std::function<int(vm &)>;
-    func_t func;
-  };
-
-  struct lua_closure {
-    simple_variant<lua_lclosure, lua_native_closure> impl;
-  };
-
   struct tvalue {
     using string_vec = small_string<32>;
 
@@ -162,6 +148,16 @@ namespace robotlua {
     void set(const tvalue &, const tvalue &);
   };
 
+  struct lua_lclosure {
+    bytecode_prototype *proto;
+    small_vector<upval_ref, 4> upval_refs;
+  };
+
+  struct lua_native_closure {
+    using func_t = std::function<int(vm &)>;
+    func_t func;
+  };
+
   /**
    * Lua objects are datatypes that are described by more than just their value. Unline
    * numbers, strings, and booleans, objects can be complex, such as Tables. 
@@ -175,12 +171,11 @@ namespace robotlua {
    */
   struct lua_object : public refcountable {
     uint8_t tag_type;
-    simple_variant<lua_table, lua_closure> data;
+    simple_variant<lua_table, lua_lclosure, lua_native_closure> data;
 
     lua_object();
 
     lua_table &table();
-    lua_closure &closure();
     lua_lclosure &lclosure();
     lua_native_closure &native_closure();
 

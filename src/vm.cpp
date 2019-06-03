@@ -106,11 +106,12 @@ void vm::define_native_function(const tvalue &key, lua_native_closure::func_t f)
 
 bool vm::precall(size_t func_stack_idx, int nreturn) {
   // TODO: Meta method, see ldo.c luaD_precall
-  object_store_ref func_ref = _registers[func_stack_idx].data.get<object_store_ref>();
-  lua_closure &closure = (*func_ref)->data.get<lua_closure>();
-  if (closure.impl.is<lua_lclosure>()) {
+  // object_store_ref func_ref = _registers[func_stack_idx].data.get<object_store_ref>();
+  //lua_closure &closure = (*func_ref)->data.get<lua_closure>();
+  lua_object &obj = *_registers[func_stack_idx].data.get<object_store_ref>().get();
+  if (obj.data.is<lua_lclosure>()) {
     // Lua closure
-    lua_lclosure &lcl = closure.impl.get<lua_lclosure>();
+    lua_lclosure &lcl = obj.lclosure();
     bytecode_prototype *proto = lcl.proto;
     // Actual number of arguments, not necessarily what's required
     size_t nargs = _registers.size() - func_stack_idx - 1;
@@ -146,9 +147,9 @@ bool vm::precall(size_t func_stack_idx, int nreturn) {
     ci.info.lua.base = base;
     ci.info.lua.pc = &proto->instructions[0];   // TODO: Should this be a pointer?
     return false;
-  } else if (closure.impl.is<lua_native_closure>()) {
+  } else if (obj.data.is<lua_native_closure>()) {
     // Native closure
-    lua_native_closure &ncl = closure.impl.get<lua_native_closure>();
+    lua_native_closure &ncl = obj.native_closure();
     // Push a new call frame
     lua_call &ci = _callinfo.emplace_back();
     ci.callstatus = 0;

@@ -27,28 +27,20 @@ lua_table &lua_object::table() {
   return data.emplace<lua_table>();
 }
 
-lua_closure &lua_object::closure() {
-  if (data.is<lua_closure>())
-    return data.get<lua_closure>();
-  return data.emplace<lua_closure>();
-}
-
 lua_lclosure &lua_object::lclosure() {
-  lua_closure &parent = closure();
-  if (parent.impl.is<lua_lclosure>())
-    return parent.impl.get<lua_lclosure>();
+  if (data.is<lua_lclosure>())
+    return data.get<lua_lclosure>();
 
   tag_type = construct_tag_type(tag::FUNC, variant::FUNC_LUA);
-  return parent.impl.emplace<lua_lclosure>();
+  return data.emplace<lua_lclosure>();
 }
 
 lua_native_closure &lua_object::native_closure() {
-  lua_closure &parent = closure();
-  if (parent.impl.is<lua_native_closure>())
-    return parent.impl.get<lua_native_closure>();
+  if (data.is<lua_native_closure>())
+    return data.get<lua_native_closure>();
 
   tag_type = construct_tag_type(tag::FUNC, variant::FUNC_C);
-  return parent.impl.emplace<lua_native_closure>();
+  return data.emplace<lua_native_closure>();
 }
 
 void lua_object::on_refcount_zero() {
