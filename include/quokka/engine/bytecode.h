@@ -85,7 +85,7 @@ struct bytecode_prototype {
   small_vector<lua_instruction, 32> instructions;
   /* Constants */
   int num_constants;
-  small_vector<tvalue, 16> constants;
+  small_vector<lua_value, 16> constants;
   /* Upvalues */
   int num_upvalues;
   small_vector<bytecode_upvalue, 4> upvalues;

@@ -161,9 +161,9 @@ void bytecode_reader::read_function(bytecode_architecture arch, bytecode_prototy
       /* NUM_INTEGER */
       func.constants.emplace_back(read_lua_integer(arch));
     } else if (ltt == lua_tag_type::STRING) {
-      tvalue &val = func.constants.emplace_back("");
+      lua_value &val = func.constants.emplace_back("");
       // read_lua_string(*this, arch, *val.value_string());
-      read_lua_string(*this, arch, val.data.get<tvalue::string_t>());
+      read_lua_string(*this, arch, val.data.get<lua_value::string_t>());
     }
   }
 
@@ -329,7 +329,7 @@ void bytecode_writer::write_function(bytecode_prototype &func) {
   // Constants
   write_native_int(func.num_constants);
   for (int i = 0; i < func.num_constants; i++) {
-    tvalue &tv = func.constants[i];
+    lua_value &tv = func.constants[i];
     // TODO: this needs to be sanitized according to ldump.c
     uint8_t tag_type = (uint8_t)tv.get_tag_type();
     // Special case - Tag type 3 (number) is 19 for integers.
@@ -344,7 +344,7 @@ void bytecode_writer::write_function(bytecode_prototype &func) {
       else
         write_lua_number(tv.data.get<lua_number>());
     } else if (t == lua_tag_type::STRING) {
-      write_lua_string(*this, tv.data.get<tvalue::string_t>());
+      write_lua_string(*this, tv.data.get<lua_value::string_t>());
     }
   }
 

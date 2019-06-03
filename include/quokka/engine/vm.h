@@ -50,22 +50,22 @@ namespace engine {
 
     // To be called from within a called function
     // Gets a local variable passed to a function. ID starts from 1
-    tvalue &argument(int id);
+    lua_value &argument(int id);
     int num_params();
-    void push(const tvalue &v);
-    void push_global(const tvalue &key) {
+    void push(const lua_value &v);
+    void push_global(const lua_value &key) {
       push(env().get(key));
     }
-    tvalue &pop();
+    lua_value &pop();
     void pop(size_t num);
 
     lua_table &env();
     object_store_ref alloc_native_function(lua_native_closure::func_t f);
-    void define_native_function(const tvalue &key, lua_native_closure::func_t f);
+    void define_native_function(const lua_value &key, lua_native_closure::func_t f);
     
    private:
     using call_ref = continuous_reference<lua_call>;
-    using reg_ref = continuous_reference<tvalue>;
+    using reg_ref = continuous_reference<lua_value>;
 
     // Return true if C function
     bool precall(size_t func_stack_idx, int nreturn);
@@ -94,7 +94,7 @@ namespace engine {
       return slot;
     }
 
-    small_vector<tvalue, 48> _registers;
+    small_vector<lua_value, 48> _registers;
     small_vector<lua_call, 16> _callinfo;
     // Upval storage - used for variables that transcend the normal scope. 
     // e.g. local variables in ownership by an anonymous function
@@ -114,7 +114,7 @@ namespace engine {
      * where different _ENVs are required should be fulfilled with multiple instances
      * of vm.
      */
-    tvalue _distinguished_env;
+    lua_value _distinguished_env;
   };
 }
 }

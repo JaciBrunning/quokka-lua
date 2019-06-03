@@ -19,13 +19,13 @@ namespace engine {
    * variant describing subtypes (e.g. float/integer numbers, lua/native functions).
    * We do not require variant, as we can derive that from `simple_variant`.
    * 
-   * The Tag Type simply gives the 'overall type' of a value (see: tvalue).
+   * The Tag Type simply gives the 'overall type' of a value (see: lua_value).
    */
   enum class lua_tag_type {
     NIL = 0,
     BOOL = 1, 
     // light_user_data ignored
-    NUMBER = 3, // Note: internally, NUMBER can be either a float or an integer internally. See tvalue for info.
+    NUMBER = 3, // Note: internally, NUMBER can be either a float or an integer internally. See lua_value for info.
     STRING = 4,
     TABLE = 5,
     FUNC = 6    // Note: internally, FUNC can be either a Lua closure or a Native closure. See lua_object for info.
@@ -108,7 +108,7 @@ namespace engine {
   struct bytecode_prototype;
   class quokka_vm;
 
-  struct tvalue {
+  struct lua_value {
     using string_t = small_string<32>;
 
     /**
@@ -121,12 +121,12 @@ namespace engine {
      */
     simple_variant<bool, lua_number, lua_integer, string_t, object_store_ref> data;
 
-    tvalue();             // Nil
-    tvalue(bool);         // Bool
-    tvalue(lua_integer);  // Int
-    tvalue(lua_number);   // Float
-    tvalue(object_store_ref);   // Obj (table, function)
-    tvalue(const char *);   // String
+    lua_value();             // Nil
+    lua_value(bool);         // Bool
+    lua_value(lua_integer);  // Int
+    lua_value(lua_number);   // Float
+    lua_value(object_store_ref);   // Obj (table, function)
+    lua_value(const char *);   // String
 
     lua_tag_type get_tag_type() const;
     bool is_nil() const;
@@ -168,22 +168,22 @@ namespace engine {
       return s;
     }
     
-    bool operator==(const tvalue &) const;
-    bool operator<(const tvalue &) const;
-    bool operator<=(const tvalue &) const;
+    bool operator==(const lua_value &) const;
+    bool operator<(const lua_value &) const;
+    bool operator<=(const lua_value &) const;
   };
 
   struct lua_table {
     struct node {
-      tvalue key;
-      tvalue value;
+      lua_value key;
+      lua_value value;
 
-      node(const tvalue &k, const tvalue &v) : key(k), value(v) {}
+      node(const lua_value &k, const lua_value &v) : key(k), value(v) {}
     };
     small_vector<node, 16> entries;
 
-    tvalue get(const tvalue &) const;
-    void set(const tvalue &, const tvalue &);
+    lua_value get(const lua_value &) const;
+    void set(const lua_value &, const lua_value &);
   };
 
   struct lua_lclosure {
@@ -258,9 +258,9 @@ namespace engine {
   struct lua_upval : public refcountable {
     /**
      * size_t: Stack offset of upval when open
-     * tvalue: Actual value of the upval when closed
+     * lua_value: Actual value of the upval when closed
      */
-    simple_variant<size_t, tvalue> value;
+    simple_variant<size_t, lua_value> value;
 
     void on_refcount_zero() override;
   };

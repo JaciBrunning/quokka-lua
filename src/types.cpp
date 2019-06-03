@@ -54,65 +54,65 @@ void lua_object::on_refcount_zero() {
   data.unassign();
 }
 
-tvalue::tvalue() {
+lua_value::lua_value() {
   data.unassign();
 }
 
-tvalue::tvalue(bool b) {
+lua_value::lua_value(bool b) {
   data.emplace<bool>(b);
 }
 
-tvalue::tvalue(lua_integer i) {
+lua_value::lua_value(lua_integer i) {
   data.emplace<lua_integer>(i);
 }
 
-tvalue::tvalue(lua_number n) {
+lua_value::lua_value(lua_number n) {
   data.emplace<lua_number>(n);
 }
 
-tvalue::tvalue(object_store_ref ref) {
+lua_value::lua_value(object_store_ref ref) {
   data.emplace<object_store_ref>(ref);
 }
 
-tvalue::tvalue(const char *s) {
+lua_value::lua_value(const char *s) {
   data.emplace<string_t>(s);
 }
 
-lua_tag_type tvalue::get_tag_type() const {
+lua_tag_type lua_value::get_tag_type() const {
   if (!data.is_assigned()) return lua_tag_type::NIL;
   if (data.is<bool>())
     return lua_tag_type::BOOL;
   if (data.is<lua_number>() || data.is<lua_integer>())
     return lua_tag_type::NUMBER;
-  if (data.is<tvalue::string_t>())
+  if (data.is<lua_value::string_t>())
     return lua_tag_type::STRING;
   // Is object
   return data.get<object_store_ref>().get()->get_tag_type();
 }
 
-bool tvalue::is_nil() const {
+bool lua_value::is_nil() const {
   return !data.is_assigned();
 }
 
-bool tvalue::is_falsey() const {
+bool lua_value::is_falsey() const {
   return is_nil() || (data.is<bool>() && !data.get<bool>());
 }
 
-object_store_ref tvalue::obj() const {
+object_store_ref lua_value::obj() const {
   return data.get<object_store_ref>();
 }
 
-bool tvalue::tonumber(lua_number &out) const {
+bool lua_value::tonumber(lua_number &out) const {
   if (data.is<lua_number>()) {
     out = data.get<lua_number>();
     return true;
   } else if (data.is<lua_integer>()) {
     out = (lua_number) data.get<lua_integer>();
     return true;
-  } else if (data.is<tvalue::string_t>()) {
+  } else if (data.is<lua_value::string_t>()) {
     // Try to parse string
     char *end;
-    lua_number n = strtod(data.get<tvalue::string_t>().c_str(), &end);
+    lua_number n = strtod(data.get<lua_value::string_t>().c_str(), &end);
     if (*end != '\0')
       return false;
     out = n;
@@ -121,7 +121,7 @@ bool tvalue::tonumber(lua_number &out) const {
   return false;
 }
 
-bool tvalue::tointeger(lua_integer &out) const {
+bool lua_value::tointeger(lua_integer &out) const {
   lua_number n;
   if (data.is<lua_integer>()) {
     out = data.get<lua_integer>();
@@ -139,11 +139,11 @@ bool tvalue::tointeger(lua_integer &out) const {
   return false;
 }
 
-bool tvalue::tostring(string_t &out) const {
+bool lua_value::tostring(string_t &out) const {
   char buf[16];
   out.clear();
-  if (data.is<tvalue::string_t>()) {
-    out.concat_str(data.get<tvalue::string_t>());
+  if (data.is<lua_value::string_t>()) {
+    out.concat_str(data.get<lua_value::string_t>());
     return true;
   } else if (data.is<lua_integer>()) {
     snprintf(buf, 16, "%d", data.get<lua_integer>());
@@ -166,7 +166,7 @@ bool tvalue::tostring(string_t &out) const {
   return false;
 }
 
-bool tvalue::operator==(const tvalue &other) const {
+bool lua_value::operator==(const lua_value &other) const {
   if (get_tag_type() != other.get_tag_type()) return false;
   // nil has no data
   if (get_tag_type() != lua_tag_type::NIL) {
@@ -192,7 +192,7 @@ bool tvalue::operator==(const tvalue &other) const {
   return true;
 }
 
-bool tvalue::operator<(const tvalue &other) const {
+bool lua_value::operator<(const lua_value &other) const {
   if (get_tag_type() == other.get_tag_type()) {
     lua_number na, nb;
     if (this->tonumber(na) && other.tonumber(nb)) {
@@ -205,7 +205,7 @@ bool tvalue::operator<(const tvalue &other) const {
   return false;
 }
 
-bool tvalue::operator<=(const tvalue &other) const {
+bool lua_value::operator<=(const lua_value &other) const {
   if (get_tag_type() == other.get_tag_type()) {
     lua_number na, nb;
     if (this->tonumber(na) && other.tonumber(nb)) {
@@ -218,15 +218,15 @@ bool tvalue::operator<=(const tvalue &other) const {
   return false;
 }
 
-tvalue lua_table::get(const tvalue &key) const {
+lua_value lua_table::get(const lua_value &key) const {
   for (size_t i = 0; i < entries.size(); i++) {
     if (entries[i].key == key)
       return entries[i].value;
   }
-  return tvalue();  // nil
+  return lua_value();  // nil
 }
 
-void lua_table::set(const tvalue &k, const tvalue &v) {
+void lua_table::set(const lua_value &k, const lua_value &v) {
   for (size_t i = 0; i < entries.size(); i++) {
     if (entries[i].key == k) {
       entries[i].value = v;
