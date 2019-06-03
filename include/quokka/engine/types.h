@@ -13,6 +13,14 @@ namespace engine {
   using lua_integer     = int;
   using lua_number      = double;
 
+  /**
+   * The Quokka Lua Tag Type is a simplified version of the PUC-RIO Tag Type.
+   * The original version has two sections: The Tag and the Variant, with the
+   * variant describing subtypes (e.g. float/integer numbers, lua/native functions).
+   * We do not require variant, as we can derive that from `simple_variant`.
+   * 
+   * The Tag Type simply gives the 'overall type' of a value (see: tvalue).
+   */
   enum class lua_tag_type {
     NIL = 0,
     BOOL = 1, 
@@ -24,15 +32,18 @@ namespace engine {
     // user_data and thread ignored
   };
 
-  // Tag types in bytecode have variant information. We don't actually care about that, since we use simplevariant,
-  // so we ignore it.
+  /**
+   * Tag types in bytecode have variant information. We don't actually care about that, since we use simplevariant,
+   * so we ignore it.
+   */
   inline lua_tag_type trunc_tag_type(uint8_t bc_tagtype) {
     return (lua_tag_type)(bc_tagtype & 0x0F);
   }
 
-  struct lua_object;
-  struct lua_upval;
-
+  /**
+   * Refcountable describes a type that is deallocated after its refcount reaches zero, similar to 
+   * a shared_ptr, but without the necessary heap allocation.
+   */
   class refcountable {
    public:
     bool is_free = true;
@@ -44,7 +55,15 @@ namespace engine {
     virtual void on_refcount_zero() {};
   };
 
-  // Store object reference with refcount.
+  // Forward decls
+  struct lua_object;
+  struct lua_upval;
+
+  /**
+   * store_refcountable is a generic form of iterator that points to a store that may change
+   * size, and thus invalidate any typical iterator types (e.g. T*). See continuous_reference<T> 
+   * for more details.
+   */
   template<typename T>
   struct store_refcountable : public continuous_reference<T> {
     store_refcountable() : continuous_reference<T>(nullptr, 0) {}
@@ -76,12 +95,17 @@ namespace engine {
     }
   };
 
+  /**
+   * Storage reference for objects
+   */
   using object_store_ref = store_refcountable<lua_object>;
+  /**
+   * Storage reference for upvals
+   */
   using upval_ref = store_refcountable<lua_upval>;
 
-  // Note: fwd declaration of bytecode_prototype in bytecode.h
+  // Fwd decls
   struct bytecode_prototype;
-  // Note: fwd declaration of quokka_vm in vm.h (needed by lua_native_closure funcdec)
   class quokka_vm;
 
   struct tvalue {

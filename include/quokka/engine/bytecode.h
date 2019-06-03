@@ -7,10 +7,15 @@
 #include "smallstring.h"
 #include "smallvector.h"
 #include "types.h"
+#include "pointer.h"
 
 namespace quokka {
 namespace engine {
 
+/**
+ * Description of a bytecode architecture. Defines the system the bytecode is compiled
+ * for.
+ */
 struct bytecode_architecture {
   bool little;
 
@@ -20,28 +25,54 @@ struct bytecode_architecture {
   uint8_t sizeof_lua_integer;
   uint8_t sizeof_lua_number;
 
+  /**
+   * Obtain the system architecture.
+   */
   static const bytecode_architecture system();
 };
 
+/**
+ * Header for a bytecode file. Contains information about the bytecode architecture, as well
+ * as some error checking information.
+ */
 struct bytecode_header {
+  /**
+   * Lua signature: literal "\x1BLua"
+   */
   char signature[4];
   uint8_t version;
   uint8_t format;
+  /**
+   * Bytecode error checking data:  Literal "\x19\x93\r\n\x1A\n"
+   */
   char data[6];
 
   bytecode_architecture arch;
 
+  /**
+   * Integer error checking data: 0x5678 (used to check endianness)
+   */
   lua_integer linteger;
+  /**
+   * Double error checking data: 370.5
+   */
   lua_number lnumber;
 };
 
+/**
+ * Description of a prototype upval.
+ */
 struct bytecode_upvalue {
   bool instack;
   uint8_t idx;
 };
 
-// Prototype is a description of a Lua function, providing its layout in 
-// bytecode, but without any of its runtime features
+/**
+ * Prototype is a description of a Lua function (aka closure), providing its
+ * layout in bytecode, but without any of its runtime features.
+ * 
+ * Debug information is not included in Quokka LE.
+ */
 struct bytecode_prototype {
   small_string<16> source;
   int line_defined;
@@ -62,29 +93,53 @@ struct bytecode_prototype {
   /* Unfortunately this is recursive, so we have to 
      have some heap allocations */
   int num_protos;
-  small_vector<bytecode_prototype *, 16> protos;    // TODO: memory leak here - functions are alloc'ed in heap.
+  small_vector<small_shared_ptr<bytecode_prototype>, 16> protos;
   // Debugging information is ignored, but still must be parsed.
   
   /* RUNTIME INFO */
+  /* This is used by the runtime to cache the closure. It has no bytecode purpose */
   object_store_ref closure_cache;
 };
 
+/**
+ * A chunk is a unit of compilation in Lua, representing a file. 
+ */
 struct bytecode_chunk {
   bytecode_header header;
   uint8_t num_upvalues;
   bytecode_prototype root_func;
 };
 
+/**
+ * The bytecode reader will read a bytecode structure from an istream,
+ * be it from a memory region, or a file.
+ */
 class bytecode_reader {
  public:
+  /**
+   * Create a new bytecode reader
+   * @param stream The input stream, pointing to either a memory region
+   *                or a file (or any other implementation of std::istream).
+   */
   bytecode_reader(std::istream &stream);
 
-  void read_chunk(bytecode_chunk &);
+  /**
+   * Read a chunk from the stream.
+   * @param c The bytecode chunk to output to
+   */
+  void read_chunk(bytecode_chunk &c);
+
+  /**
+   * Read a chunk from the stream
+   * @returns The bytecode chunk
+   */
   bytecode_chunk read_chunk() {
     bytecode_chunk c;
     read_chunk(c);
     return c;
   }
+
+  /* INTERNAL */
 
   void read_header(bytecode_header &);
   void read_function(bytecode_architecture, bytecode_prototype &);
@@ -102,12 +157,27 @@ class bytecode_reader {
   const bytecode_architecture _sys_arch = bytecode_architecture::system();
 };
 
-#ifndef NO_BYTECODE_WRITER
+#ifdef WITH_BYTECODE_WRITER
+/**
+ * The bytecode writer allows writing a bytecode program with a specified architecture,
+ * allowing for transpiling.
+ */
 class bytecode_writer {
  public:
+  /**
+   * Create a new bytecode writer
+   * @param stream The output stream, pointing to a memory region, file, or any other std::ostream.
+   * @param target_arch The target architecture. 
+   */
   bytecode_writer(std::ostream &stream, bytecode_architecture target_arch);
 
-  void write_chunk(bytecode_chunk &);
+  /**
+   * Write a bytecode chunk to the stream
+   * @param c The bytecode chunk to write
+   */
+  void write_chunk(bytecode_chunk &c);
+
+  /* INTERNAL */
 
   void write_header(bytecode_header &);
   void write_function(bytecode_prototype &);
