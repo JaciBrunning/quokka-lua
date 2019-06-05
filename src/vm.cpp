@@ -8,7 +8,7 @@ using namespace quokka::engine;
 quokka_vm::quokka_vm() {
   // Load distinguished env.
   object_store_ref objstore = alloc_object();
-  (*objstore)->table();
+  (*objstore)->table().set("__QUOKKA_LE__", "0.0.1");
   _distinguished_env = lua_value(objstore);
 }
 
