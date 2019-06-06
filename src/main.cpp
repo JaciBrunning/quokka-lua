@@ -4,6 +4,7 @@ using namespace quokka::engine;
 
 #include <fstream>
 #include <iostream>
+#include <time.h>
 
 int main() {
   std::ifstream bytecode_in("luac.out");
@@ -16,6 +17,13 @@ int main() {
     std::cout << v.argument(0).tostring().c_str() << std::endl;
     return 0;
   });
+
+  object_store_ref os = v.alloc_object();
+  (*os)->table().set("clock", v.alloc_native_function([](quokka_vm &v) {
+    v.push( (double)(clock()) / (double)(CLOCKS_PER_SEC) );
+    return 1;
+  }));
+  v.env().set("os", os);
 
   v.call();
 
