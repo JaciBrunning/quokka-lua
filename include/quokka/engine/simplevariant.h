@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <new>
 #include <typeinfo>
+#include <typeindex>
 
 namespace quokka {
 namespace engine {
@@ -16,22 +17,22 @@ namespace engine {
 
   template <typename U, typename... T>
   struct variant_funcs<U, T...> {
-    inline static void copy(size_t id, const char *src, char *dst) {
-      if (id == typeid(U).hash_code())
+    inline static void copy(std::type_index id, const char *src, char *dst) {
+      if (id == std::type_index(typeid(U)))
         ::new (dst) U(*reinterpret_cast<const U *>(src));  // call copy
       else
         variant_funcs<T...>::copy(id, src, dst);
     }
 
-    inline static void move(size_t id, char *src, char *dst) {
-      if (id == typeid(U).hash_code())
+    inline static void move(std::type_index id, char *src, char *dst) {
+      if (id == std::type_index(typeid(U)))
         ::new (dst) U(std::move(*reinterpret_cast<U *>(src)));  // call move
       else
         variant_funcs<T...>::move(id, src, dst);  // try the next candidate type
     }
 
-    inline static void destroy(size_t id, char *src) {
-      if (id == typeid(U).hash_code())
+    inline static void destroy(std::type_index id, char *src) {
+      if (id == std::type_index(typeid(U)))
         reinterpret_cast<U *>(src)->~U();
       else
         variant_funcs<T...>::destroy(id, src);  // try the next candidate type
@@ -67,9 +68,9 @@ namespace engine {
   // For when all options are exhaused (i.e. none type)
   template <>
   struct variant_funcs<> {
-    inline static void copy(size_t, const char *, char *) {}
-    inline static void move(size_t, char *, char *) {}
-    inline static void destroy(size_t, char *) {}
+    inline static void copy(std::type_index, const char *, char *) {}
+    inline static void move(std::type_index, char *, char *) {}
+    inline static void destroy(std::type_index, char *) {}
   };
 
   /**
@@ -82,7 +83,7 @@ namespace engine {
 
     static const size_t size = max_sizeof<T...>::value;
 
-    size_t _type_id = typeid(void).hash_code();
+    std::type_index _type_id = std::type_index(typeid(void));
     char   _data_raw[size];
 
     simple_variant() {}
@@ -95,7 +96,7 @@ namespace engine {
     simple_variant(const simple_variant<T...> &other) {
       // Copy
       _type_id = other._type_id;
-      variant_func_t::copy(other._type_id, &other._data_raw[0], &_data_raw[0]);
+      variant_func_t::copy((std::type_index)other._type_id, &other._data_raw[0], &_data_raw[0]);
     }
 
     simple_variant(simple_variant<T...> &&other) {
@@ -131,7 +132,7 @@ namespace engine {
     U& emplace(Args &&... args) {
       variant_func_t::destroy(_type_id, &_data_raw[0]);
       ::new (&_data_raw[0]) U(std::forward<Args>(args)...);
-      _type_id = typeid(U).hash_code();
+      _type_id = std::type_index(typeid(U));
       return get<U>();
     }
 
@@ -140,7 +141,7 @@ namespace engine {
      */
     void unassign() {
       variant_func_t::destroy(_type_id, &_data_raw[0]);
-      _type_id = typeid(void).hash_code();
+      _type_id = std::type_index(typeid(void));
     }
 
     /**
@@ -161,14 +162,14 @@ namespace engine {
      */
     template <typename U>
     bool is() const {
-      return (_type_id == typeid(U).hash_code());
+      return (_type_id == std::type_index(typeid(U)));
     }
 
     /**
      * Check if this variant is assigned.
      * @return True if this variant is assigned (has data).
      */
-    bool is_assigned() const { return (_type_id != typeid(void).hash_code()); }
+    bool is_assigned() const { return (_type_id != std::type_index(typeid(void))); }
   };
 }  // namespace engine
 }  // namespace quokka
