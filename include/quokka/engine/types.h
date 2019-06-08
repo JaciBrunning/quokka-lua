@@ -103,10 +103,21 @@ namespace engine {
    * Storage reference for upvals
    */
   using upval_ref = store_refcountable<lua_upval>;
+  /**
+   * String type for values
+   */
+  using value_string_t = small_string<32>;
 
   // Fwd decls
   struct bytecode_prototype;
   class quokka_vm;
+
+  /* Variant hashes for value */
+  MAKE_VARIANT_HASH(bool, 1);
+  MAKE_VARIANT_HASH(lua_integer, 2);
+  MAKE_VARIANT_HASH(lua_number, 3);
+  MAKE_VARIANT_HASH(value_string_t, 4);
+  MAKE_VARIANT_HASH(object_store_ref, 5);
 
   /**
    * lua_value is the main container for data in Lua, containing the value of any variables
@@ -128,7 +139,7 @@ namespace engine {
    *    - to* conversion functions  Convert types if applicable. These do perform type checking and coercion where necessary
    */
   struct lua_value {
-    using string_t = small_string<32>;
+    using string_t = value_string_t;
 
     /**
      * Data storage for the lua_value. 
@@ -325,6 +336,11 @@ namespace engine {
     func_t func;
   };
 
+  /* Variant hashes for object */
+  MAKE_VARIANT_HASH(lua_table, 16);
+  MAKE_VARIANT_HASH(lua_lclosure, 17);
+  MAKE_VARIANT_HASH(lua_native_closure, 18);
+
   /**
    * Lua objects are datatypes that are described by more than just their value. Unlike
    * numbers, strings, and booleans, objects can be complex, such as tables. 
@@ -353,6 +369,10 @@ namespace engine {
     void on_refcount_zero() override;
   };
   
+  /* Variant hashes for upval */
+  MAKE_VARIANT_HASH(size_t, 20);
+  MAKE_VARIANT_HASH(lua_value, 21);
+
   /**
    * The Upval is a construct of Lua that allows for values to exist oustide of their
    * regular scope. Consider the case of the anonymous function:

@@ -163,23 +163,6 @@ namespace engine {
     object_store_ref lclosure_cache(bytecode_prototype &proto, size_t func_base, object_store_ref parent_cl);
     object_store_ref lclosure_new(bytecode_prototype &proto, size_t func_base, object_store_ref parent_cl);
 
-    /**
-     * Find the next available 'slot' in a vector that contains single-element
-     * variants.
-     */
-    template<typename T, size_t S>
-    size_t first_avail_idx(small_vector<simple_variant<T>, S> &v) {
-      for (size_t i = 0; i < v.size(); i++) {
-        if (!v[i].is_assigned()) return i;
-      }
-      // Create a new slot if one doesn't exist.
-      // Safe to emplace since we have to call another emplace on the actual 
-      // variant.
-      size_t slot = v.size();
-      v.emplace_back();
-      return slot;
-    }
-
     small_vector<lua_value, 48> _registers;
     small_vector<lua_call, 16> _callinfo;
     // Upval storage - used for variables that transcend the normal scope. 

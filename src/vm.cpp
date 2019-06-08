@@ -566,8 +566,8 @@ void quokka_vm::execute() {
           if ( (step > 0) ? (idx <= limit) : (limit <= idx) ) {
             // Jump pc by sBx
             RL_quokka_vm_PC(_ci_ref) += opcode_util::get_sBx(_instruction);
-            _registers.emplace(_ra, lua_value(idx));
-            _registers.emplace(_ra + 3, _registers[_ra]);
+            _registers.emplace(_ra, idx);
+            _registers.emplace(_ra + 3, idx);
           }
         } else {
           // floating point loop
@@ -577,8 +577,8 @@ void quokka_vm::execute() {
           if ( (step > 0) ? (idx <= limit) : (limit <= idx) ) {
             // Jump pc by sBx
             RL_quokka_vm_PC(_ci_ref) += opcode_util::get_sBx(_instruction);
-            _registers.emplace(_ra, lua_value(idx));
-            _registers.emplace(_ra + 3, _registers[_ra]);
+            _registers.emplace(_ra, idx);
+            _registers.emplace(_ra + 3, idx);
           }
         }
         break;

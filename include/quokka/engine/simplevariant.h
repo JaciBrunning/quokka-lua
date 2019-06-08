@@ -10,11 +10,21 @@ namespace engine {
   // Simple implementation of std::variant, using C++ compile-time magic
   // in order to provide a union of complex (non-trivial) types.
 
-  using variant_type_id = std::type_index;
+  // TODO: Need to implement a way to do variantfuncs without recursing - std::visit builds a table?
 
   template<typename T>
-  constexpr variant_type_id variant_typeid_func() {
-    return variant_type_id(typeid(T));
+  struct variant_type_hash;
+
+  #define MAKE_VARIANT_HASH(T, V) template<> struct variant_type_hash<T> { static constexpr size_t value = V; }
+
+  MAKE_VARIANT_HASH(void, 1);
+
+  // using variant_type_id = std::type_index;
+  using variant_type_id = size_t;
+
+  template<typename T>
+  inline variant_type_id variant_typeid_func() {
+    return variant_type_hash<T>::value;
   }
 
   /* Template specialization for move, copy, delete - since we need to infer the type */
@@ -24,21 +34,21 @@ namespace engine {
   template <typename U, typename... T>
   struct variant_funcs<U, T...> {
     inline static void copy(const variant_type_id &id, const char *src, char *dst) {
-      if (id == variant_typeid_func<U>())
+      if (id == variant_type_hash<U>::value)
         ::new (dst) U(*reinterpret_cast<const U *>(src));  // call copy
       else
         variant_funcs<T...>::copy(id, src, dst);
     }
 
     inline static void move(const variant_type_id &id, char *src, char *dst) {
-      if (id == variant_typeid_func<U>())
+      if (id == variant_type_hash<U>::value)
         ::new (dst) U(std::move(*reinterpret_cast<U *>(src)));  // call move
       else
         variant_funcs<T...>::move(id, src, dst);  // try the next candidate type
     }
 
     inline static void destroy(const variant_type_id &id, char *src) {
-      if (id == variant_typeid_func<U>())
+      if (id == variant_type_hash<U>::value)
         reinterpret_cast<U *>(src)->~U();
       else
         variant_funcs<T...>::destroy(id, src);  // try the next candidate type
@@ -89,7 +99,7 @@ namespace engine {
 
     static const size_t size = max_sizeof<T...>::value;
 
-    variant_type_id _type_id = variant_typeid_func<void>();
+    variant_type_id _type_id = variant_type_hash<void>::value;
     char   _data_raw[size];
 
     simple_variant() {}
@@ -138,7 +148,7 @@ namespace engine {
     U& emplace(Args &&... args) {
       variant_func_t::destroy(_type_id, &_data_raw[0]);
       ::new (&_data_raw[0]) U(std::forward<Args>(args)...);
-      _type_id = variant_typeid_func<U>();
+      _type_id = variant_type_hash<U>::value;
       return get<U>();
     }
 
@@ -147,7 +157,7 @@ namespace engine {
      */
     void unassign() {
       variant_func_t::destroy(_type_id, &_data_raw[0]);
-      _type_id = variant_typeid_func<void>();
+      _type_id = variant_type_hash<void>::value;
     }
 
     /**
@@ -168,14 +178,14 @@ namespace engine {
      */
     template <typename U>
     bool is() const {
-      return (_type_id == variant_typeid_func<U>());
+      return (_type_id == variant_type_hash<U>::value);
     }
 
     /**
      * Check if this variant is assigned.
      * @return True if this variant is assigned (has data).
      */
-    bool is_assigned() const { return (_type_id != variant_typeid_func<void>()); }
+    bool is_assigned() const { return (_type_id != variant_type_hash<void>::value); }
   };
 }  // namespace engine
 }  // namespace quokka
