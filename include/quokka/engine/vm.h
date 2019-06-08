@@ -2,6 +2,7 @@
 
 #include "bytecode.h"
 #include "smallvector.h"
+#include "opcodes.h"
 
 #include <functional>
 
@@ -200,6 +201,17 @@ namespace engine {
      * of vm.
      */
     lua_value _distinguished_env;
+
+    /* Instruction and Call info */
+    lua_instruction _instruction;
+    opcode _code;
+    uint8_t _arg_a;
+    unsigned int _arg_b, _arg_c;
+    size_t _ra;
+
+    call_ref _ci_ref;
+    object_store_ref _cl_ref;
+    size_t _base;
   };
 }
 }

@@ -166,81 +166,79 @@ bool quokka_vm::precall(size_t func_stack_idx, int nreturn) {
   target = upv_->value.is<size_t>() ? &_registers[upv_->value.get<size_t>()] : &upv_->value.get<lua_value>(); }
 // Decode a B or C register, using a constant value or stack value where appropriate
 // Note that lua quokka_vm indexes constants from 1, but upvalues from 0 for some reason.
-#define RL_quokka_vm_RK(v) (opcode_util::is_const(v) ? proto->constants[opcode_util::val(v)] : _registers[base + opcode_util::val(v)])
+#define RL_quokka_vm_RK(v) (opcode_util::is_const(v) ? proto->constants[opcode_util::val(v)] : _registers[_base + opcode_util::val(v)])
 
 void quokka_vm::execute() {
   _callinfo.last().callstatus |= CALL_STATUS_FRESH;
  new_call:
   ;
-  call_ref ci_ref(&_callinfo, _callinfo.size() - 1);
-  reg_ref cl_reg_ref(&_registers, (*ci_ref)->func_idx);
-  object_store_ref cl_ref = (*cl_reg_ref)->data.get<object_store_ref>();
-  bytecode_prototype *proto = (*cl_ref)->lclosure().proto;
-  size_t base = (*ci_ref)->info.lua.base;
+  _ci_ref = call_ref(&_callinfo, _callinfo.size() - 1);
+  reg_ref cl_reg_ref(&_registers, (*_ci_ref)->func_idx);
+  _cl_ref = (*cl_reg_ref)->data.get<object_store_ref>();
+  bytecode_prototype *proto = (*_cl_ref)->lclosure().proto;
+  _base = (*_ci_ref)->info.lua.base;
 
   while (true) {
-    lua_instruction instruction = *(RL_quokka_vm_PC(ci_ref)++);
-    opcode code = opcode_util::get_opcode(instruction);
-    uint8_t arg_a = opcode_util::get_A(instruction);
-    size_t ra = base + (size_t)arg_a;
-    unsigned int arg_b = opcode_util::get_B(instruction);
-    unsigned int arg_c = opcode_util::get_C(instruction);
-    uint32_t bx = opcode_util::get_Bx(instruction);
+    _instruction = *(RL_quokka_vm_PC(_ci_ref)++);
+    _code = opcode_util::get_opcode(_instruction);
+    _arg_a = opcode_util::get_A(_instruction);
+    _ra = _base + (size_t)_arg_a;
+    _arg_b = opcode_util::get_B(_instruction);
+    _arg_c = opcode_util::get_C(_instruction);
 
-    switch(code) {
+    switch(_code) {
       case opcode::OP_MOVE:
         // Move R(B) to R(A)
-        _registers[ra] = _registers[base + opcode_util::val(arg_b)];
+        _registers[_ra] = _registers[_base + opcode_util::val(_arg_b)];
         break;
       case opcode::OP_LOADK:
         // Move K(Bx) to R(A)
-        _registers.emplace(ra, proto->constants[bx]);
+        _registers.emplace(_ra, proto->constants[opcode_util::get_Bx(_instruction)]);
         break;
       case opcode::OP_LOADKX:
         // Move K(extra arg) to R(A)
         // Next instruction is extra arg, so we have to advance the instruction counter
-        _registers.emplace(ra, proto->constants[opcode_util::get_Ax(*(RL_quokka_vm_PC(ci_ref)++))]);
+        _registers.emplace(_ra, proto->constants[opcode_util::get_Ax(*(RL_quokka_vm_PC(_ci_ref)++))]);
         break;
       case opcode::OP_LOADBOOL:
         // Load (Bool)B into R(A), if C, pc++ (skip next instruction)
-        _registers.emplace(ra, arg_b > 0);
-        if (arg_c > 0)
-          RL_quokka_vm_PC(ci_ref)++;
+        _registers.emplace(_ra, _arg_b > 0);
+        if (_arg_c > 0)
+          RL_quokka_vm_PC(_ci_ref)++;
         break;
       case opcode::OP_LOADNIL:
         // R(A), R(A+1) .. R(A+B) = nil
         do {
-          _registers.emplace(ra++); // set nil
-        } while(arg_b--);
+          _registers.emplace(_ra++); // set nil
+        } while(_arg_b--);
         break;
       case opcode::OP_GETUPVAL: {
         // R(A) = Upval[B]
         lua_value *tv;
-        RL_quokka_vm_UPV(arg_b, tv, cl_ref);
-        _registers.emplace(ra, *tv);
+        RL_quokka_vm_UPV(_arg_b, tv, _cl_ref);
+        _registers.emplace(_ra, *tv);
         break;
       }
       case opcode::OP_GETTABUP: {
         // R(A) = Upval[B][RK(C)]
         lua_value *tuv;
-        RL_quokka_vm_UPV(arg_b, tuv, cl_ref);
+        RL_quokka_vm_UPV(_arg_b, tuv, _cl_ref);
         lua_table &table = tuv->obj().get()->table();
         // _registers[ra] = table.get(RL_quokka_vm_RK(arg_c));
-        _registers.emplace(ra, table.get(RL_quokka_vm_RK(arg_c)));
+        _registers.emplace(_ra, table.get(RL_quokka_vm_RK(_arg_c)));
         break;
       }
       case opcode::OP_GETTABLE: {
         // R(A) = R(B)[RK(C)]
-        lua_table &table = _registers[base + opcode_util::val(arg_b)].obj().get()->table();
-        // _registers[ra] = table.get(RL_quokka_vm_RK(arg_c));
-        _registers.emplace(ra, table.get(RL_quokka_vm_RK(arg_c)));
+        lua_table &table = _registers[_base + opcode_util::val(_arg_b)].obj().get()->table();
+        _registers.emplace(_ra, table.get(RL_quokka_vm_RK(_arg_c)));
         break;
       }
       case opcode::OP_SETTABUP: {
         // Upval[A][RK(B)] = RK(C)
         lua_value *tupv;
-        RL_quokka_vm_UPV(arg_a, tupv, cl_ref);
-        tupv->obj().get()->table().set(RL_quokka_vm_RK(arg_b), RL_quokka_vm_RK(arg_c));
+        RL_quokka_vm_UPV(_arg_a, tupv, _cl_ref);
+        tupv->obj().get()->table().set(RL_quokka_vm_RK(_arg_b), RL_quokka_vm_RK(_arg_c));
         break;
       }
       case opcode::OP_SETUPVAL: {
@@ -249,247 +247,247 @@ void quokka_vm::execute() {
         // lua_upval *upv = (*cl_ref)->lclosure().upval_refs[arg_a].get();
         // upv->value.emplace<size_t>(ra);
         lua_value *tv;
-        RL_quokka_vm_UPV(arg_b, tv, cl_ref);
-        *tv = _registers[ra];
+        RL_quokka_vm_UPV(_arg_b, tv, _cl_ref);
+        *tv = _registers[_ra];
         break;
       }
       case opcode::OP_SETTABLE:
         // R(A)[RK(B)] = RK(C)
-        _registers[ra].obj().get()->table().set(RL_quokka_vm_RK(arg_b), RL_quokka_vm_RK(arg_c));
+        _registers[_ra].obj().get()->table().set(RL_quokka_vm_RK(_arg_b), RL_quokka_vm_RK(_arg_c));
         break;
       case opcode::OP_NEWTABLE: {
         // R(A) = {} (size = B,C)
         object_store_ref objref = alloc_object();
         (*objref)->table();
-        _registers.emplace(ra, objref);
+        _registers.emplace(_ra, objref);
         break;
       }
       case opcode::OP_SELF: {
         // R(A + 1) = R(B); R(A) = R(B)[RK(C)]
-        _registers[ra + 1] = _registers[base + opcode_util::val(arg_b)];
-        lua_table &table = _registers[base + opcode_util::val(arg_b)].obj().get()->table();
-        _registers.emplace(ra, table.get(RL_quokka_vm_RK(arg_c)));
+        _registers[_ra + 1] = _registers[_base + opcode_util::val(_arg_b)];
+        lua_table &table = _registers[_base + opcode_util::val(_arg_b)].obj().get()->table();
+        _registers.emplace(_ra, table.get(RL_quokka_vm_RK(_arg_c)));
         break;
       }
       case opcode::OP_ADD: {
         // R(A) = RK(B) + RK(C)
-        lua_value &nb = RL_quokka_vm_RK(arg_b);
-        lua_value &nc = RL_quokka_vm_RK(arg_c);
+        lua_value &nb = RL_quokka_vm_RK(_arg_b);
+        lua_value &nc = RL_quokka_vm_RK(_arg_c);
         lua_number lnb, lnc;
         if (nb.data.is<lua_integer>() && nc.data.is<lua_integer>()) {
           lua_integer result = nb.data.get<lua_integer>() + nc.data.get<lua_integer>();
-          _registers.emplace(ra, result);
+          _registers.emplace(_ra, result);
         } else if (nb.tonumber(lnb) && nc.tonumber(lnc)) {
-          _registers.emplace(ra, lnb + lnc);
+          _registers.emplace(_ra, lnb + lnc);
         }
         break;
       }
       case opcode::OP_SUB: {
         // R(A) = RK(B) - RK(C)
-        lua_value &nb = RL_quokka_vm_RK(arg_b);
-        lua_value &nc = RL_quokka_vm_RK(arg_c);
+        lua_value &nb = RL_quokka_vm_RK(_arg_b);
+        lua_value &nc = RL_quokka_vm_RK(_arg_c);
         lua_number lnb, lnc;
         if (nb.data.is<lua_integer>() && nc.data.is<lua_integer>()) {
           lua_integer result = nb.data.get<lua_integer>() - nc.data.get<lua_integer>();
-          _registers.emplace(ra, result);
+          _registers.emplace(_ra, result);
         } else if (nb.tonumber(lnb) && nc.tonumber(lnc)) {
-          _registers.emplace(ra, lnb - lnc);
+          _registers.emplace(_ra, lnb - lnc);
         }
         break;
       }
       case opcode::OP_MUL: {
         // R(A) = RK(B) * RK(C)
-        lua_value &nb = RL_quokka_vm_RK(arg_b);
-        lua_value &nc = RL_quokka_vm_RK(arg_c);
+        lua_value &nb = RL_quokka_vm_RK(_arg_b);
+        lua_value &nc = RL_quokka_vm_RK(_arg_c);
         lua_number lnb, lnc;
         if (nb.data.is<lua_integer>() && nc.data.is<lua_integer>()) {
           lua_integer result = nb.data.get<lua_integer>() * nc.data.get<lua_integer>();
-          _registers.emplace(ra, result);
+          _registers.emplace(_ra, result);
         } else if (nb.tonumber(lnb) && nc.tonumber(lnc)) {
-          _registers.emplace(ra, lnb * lnc);
+          _registers.emplace(_ra, lnb * lnc);
         }
         break;
       }
       case opcode::OP_MOD: {
         // R(A) = RK(B) % RK(C)
-        lua_value &nb = RL_quokka_vm_RK(arg_b);
-        lua_value &nc = RL_quokka_vm_RK(arg_c);
+        lua_value &nb = RL_quokka_vm_RK(_arg_b);
+        lua_value &nc = RL_quokka_vm_RK(_arg_c);
         lua_number lnb, lnc;
         if (nb.data.is<lua_integer>() && nc.data.is<lua_integer>()) {
           lua_integer result = nb.data.get<lua_integer>() % nc.data.get<lua_integer>();
-          _registers.emplace(ra, result);
+          _registers.emplace(_ra, result);
         } else if (nb.tonumber(lnb) && nc.tonumber(lnc)) {
-          _registers.emplace(ra, fmod(lnb, lnc));
+          _registers.emplace(_ra, fmod(lnb, lnc));
         }
         break;
       }
       case opcode::OP_POW: {
         // R(A) = RK(B) ^ RK(C)
-        lua_value &nb = RL_quokka_vm_RK(arg_b);
-        lua_value &nc = RL_quokka_vm_RK(arg_c);
+        lua_value &nb = RL_quokka_vm_RK(_arg_b);
+        lua_value &nc = RL_quokka_vm_RK(_arg_c);
         lua_number lnb, lnc;
         if (nb.tonumber(lnb) && nc.tonumber(lnc)) {
-          _registers.emplace(ra, pow(lnb, lnc));
+          _registers.emplace(_ra, pow(lnb, lnc));
         }
         break;
       }
       case opcode::OP_DIV: {
         // R(A) = RK(B) / RK(C)
-        lua_value &nb = RL_quokka_vm_RK(arg_b);
-        lua_value &nc = RL_quokka_vm_RK(arg_c);
+        lua_value &nb = RL_quokka_vm_RK(_arg_b);
+        lua_value &nc = RL_quokka_vm_RK(_arg_c);
         lua_number lnb, lnc;
         if (nb.data.is<lua_integer>() && nc.data.is<lua_integer>()) {
           lua_integer result = nb.data.get<lua_integer>() / nc.data.get<lua_integer>();
-          _registers.emplace(ra, result);
+          _registers.emplace(_ra, result);
         } else if (nb.tonumber(lnb) && nc.tonumber(lnc)) {
-          _registers.emplace(ra, lnb / lnc);
+          _registers.emplace(_ra, lnb / lnc);
         }
         break;
       }
       case opcode::OP_IDIV: {
         // R(A) = RK(B) // RK(C)
-        lua_value &nb = RL_quokka_vm_RK(arg_b);
-        lua_value &nc = RL_quokka_vm_RK(arg_c);
+        lua_value &nb = RL_quokka_vm_RK(_arg_b);
+        lua_value &nc = RL_quokka_vm_RK(_arg_c);
         lua_number lnb, lnc;
         if (nb.data.is<lua_integer>() && nc.data.is<lua_integer>()) {
           lua_integer result = nb.data.get<lua_integer>() / nc.data.get<lua_integer>();
-          _registers.emplace(ra, result);
+          _registers.emplace(_ra, result);
         } else if (nb.tonumber(lnb) && nc.tonumber(lnc)) {
-          _registers.emplace(ra, (lua_integer)(lnb / lnc));
+          _registers.emplace(_ra, (lua_integer)(lnb / lnc));
         }
         break;
       }
       case opcode::OP_BAND: {
         // R(A) = RK(B) + RK(C)
-        lua_value &nb = RL_quokka_vm_RK(arg_b);
-        lua_value &nc = RL_quokka_vm_RK(arg_c);
+        lua_value &nb = RL_quokka_vm_RK(_arg_b);
+        lua_value &nc = RL_quokka_vm_RK(_arg_c);
         if (nb.data.is<lua_integer>() && nc.data.is<lua_integer>()) {
           lua_integer result = nb.data.get<lua_integer>() & nc.data.get<lua_integer>();
-          _registers.emplace(ra, result);
+          _registers.emplace(_ra, result);
         }
         break;
       }
       case opcode::OP_BOR: {
         // R(A) = RK(B) | RK(C)
-        lua_value &nb = RL_quokka_vm_RK(arg_b);
-        lua_value &nc = RL_quokka_vm_RK(arg_c);
+        lua_value &nb = RL_quokka_vm_RK(_arg_b);
+        lua_value &nc = RL_quokka_vm_RK(_arg_c);
         if (nb.data.is<lua_integer>() && nc.data.is<lua_integer>()) {
           lua_integer result = nb.data.get<lua_integer>() | nc.data.get<lua_integer>();
-          _registers.emplace(ra, result);
+          _registers.emplace(_ra, result);
         }
         break;
       }
       case opcode::OP_BXOR: {
         // R(A) = RK(B) ~ RK(C)
-        lua_value &nb = RL_quokka_vm_RK(arg_b);
-        lua_value &nc = RL_quokka_vm_RK(arg_c);
+        lua_value &nb = RL_quokka_vm_RK(_arg_b);
+        lua_value &nc = RL_quokka_vm_RK(_arg_c);
         if (nb.data.is<lua_integer>() && nc.data.is<lua_integer>()) {
           lua_integer result = nb.data.get<lua_integer>() ^ nc.data.get<lua_integer>();
-          _registers.emplace(ra, result);
+          _registers.emplace(_ra, result);
         }
         break;
       }
       case opcode::OP_SHL: {
         // R(A) = RK(B) << RK(C)
-        lua_value &nb = RL_quokka_vm_RK(arg_b);
-        lua_value &nc = RL_quokka_vm_RK(arg_c);
+        lua_value &nb = RL_quokka_vm_RK(_arg_b);
+        lua_value &nc = RL_quokka_vm_RK(_arg_c);
         if (nb.data.is<lua_integer>() && nc.data.is<lua_integer>()) {
           lua_integer result = nb.data.get<lua_integer>() << nc.data.get<lua_integer>();
-          _registers.emplace(ra, result);
+          _registers.emplace(_ra, result);
         }
         break;
       }
       case opcode::OP_SHR: {
         // R(A) = RK(B) >> RK(C)
-        lua_value &nb = RL_quokka_vm_RK(arg_b);
-        lua_value &nc = RL_quokka_vm_RK(arg_c);
+        lua_value &nb = RL_quokka_vm_RK(_arg_b);
+        lua_value &nc = RL_quokka_vm_RK(_arg_c);
         if (nb.data.is<lua_integer>() && nc.data.is<lua_integer>()) {
           lua_integer result = nb.data.get<lua_integer>() >> nc.data.get<lua_integer>();
-          _registers.emplace(ra, result);
+          _registers.emplace(_ra, result);
         }
         break;
       }
       case opcode::OP_UNM: {
         // R(A) = -R(B)
-        lua_value &n = _registers[base + opcode_util::val(arg_b)];
+        lua_value &n = _registers[_base + opcode_util::val(_arg_b)];
         lua_number ln;
         if (n.data.is<lua_integer>()) {
-          _registers.emplace(ra, -n.data.get<lua_integer>());
+          _registers.emplace(_ra, -n.data.get<lua_integer>());
         } else if (n.tonumber(ln)) {
-          _registers.emplace(ra, -ln);
+          _registers.emplace(_ra, -ln);
         }
         break;
       }
       case opcode::OP_BNOT: {
         // R(A) = ~R(B)
-        lua_value &n = _registers[base + opcode_util::val(arg_b)];
+        lua_value &n = _registers[_base + opcode_util::val(_arg_b)];
         lua_integer li;
         if (n.tointeger(li)) {
           // _registers[ra] = ~li;
-          _registers.emplace(ra, ~li);
+          _registers.emplace(_ra, ~li);
         }
         break;
       }
       case opcode::OP_NOT: {
         // R(A) = not R(B)
-        lua_value &n = _registers[base + opcode_util::val(arg_b)];
-        _registers.emplace(ra, n.is_falsey());
+        lua_value &n = _registers[_base + opcode_util::val(_arg_b)];
+        _registers.emplace(_ra, n.is_falsey());
         break;
       }
       case opcode::OP_LEN: {
         // R(A) = length of R(B)
-        lua_value &n = _registers[base + opcode_util::val(arg_b)];
+        lua_value &n = _registers[_base + opcode_util::val(_arg_b)];
         if (n.data.is<lua_value::string_t>()) {
-          _registers.emplace(ra, (lua_integer) n.data.get<lua_value::string_t>().size());
+          _registers.emplace(_ra, (lua_integer) n.data.get<lua_value::string_t>().size());
         } else if (n.data.is<object_store_ref>()) {
           object_store_ref o = n.obj();
           if (o.get()->data.is<lua_table>()) {
-            _registers.emplace(ra, (lua_integer) o.get()->table().entries.size());
+            _registers.emplace(_ra, (lua_integer) o.get()->table().entries.size());
           }
         }
         break;
       }
       case opcode::OP_CONCAT: {
         // R(A) = R(B) .. .. R(C)
-        if (ra != base + arg_b)
-          _registers.emplace(ra, _registers[base + arg_b]);
-        for (size_t i = base + arg_b + 1; i <= base + arg_c; i++)
-          _registers[ra].data.get<lua_value::string_t>().concat_str(_registers[i].tostring());
+        if (_ra != _base + _arg_b)
+          _registers.emplace(_ra, _registers[_base + _arg_b]);
+        for (size_t i = _base + _arg_b + 1; i <= _base + _arg_c; i++)
+          _registers[_ra].data.get<lua_value::string_t>().concat_str(_registers[i].tostring());
         break;
       }
       case opcode::OP_JMP: {
         // pc += sBx; if (A) close all upvals >= R(A - 1)
-        if (arg_a != 0) {
+        if (_arg_a != 0) {
           // Close upvals
-          close_upvals(ra - 1);
+          close_upvals(_ra - 1);
         }
-        RL_quokka_vm_PC(ci_ref) += opcode_util::get_sBx(instruction);
+        RL_quokka_vm_PC(_ci_ref) += opcode_util::get_sBx(_instruction);
         break;
       }
       case opcode::OP_EQ: {
         // if ((RK(B) == RK(C)) ~= A) then pc++ (skip jmp), otherwise do next jump
-        if ((RL_quokka_vm_RK(arg_b) == RL_quokka_vm_RK(arg_c)) != arg_a) {
-          RL_quokka_vm_PC(ci_ref)++;
+        if ((RL_quokka_vm_RK(_arg_b) == RL_quokka_vm_RK(_arg_c)) != _arg_a) {
+          RL_quokka_vm_PC(_ci_ref)++;
         }
         break;
       }
       case opcode::OP_LT:
         // if ((RK(B) <  RK(C)) ~= A) then pc++ (skip jmp), otherwise do next jump
-        if ((RL_quokka_vm_RK(arg_b) < RL_quokka_vm_RK(arg_c)) != arg_a) {
-          RL_quokka_vm_PC(ci_ref)++;
+        if ((RL_quokka_vm_RK(_arg_b) < RL_quokka_vm_RK(_arg_c)) != _arg_a) {
+          RL_quokka_vm_PC(_ci_ref)++;
         }
         break;
       case opcode::OP_LE:
         // if ((RK(B) <= RK(C)) ~= A) then pc++ (skip jmp), otherwise do next jump
-        if ((RL_quokka_vm_RK(arg_b) <= RL_quokka_vm_RK(arg_c)) != arg_a) {
-          RL_quokka_vm_PC(ci_ref)++;
+        if ((RL_quokka_vm_RK(_arg_b) <= RL_quokka_vm_RK(_arg_c)) != _arg_a) {
+          RL_quokka_vm_PC(_ci_ref)++;
         }
         break;
       case opcode::OP_TEST: {
         // if not (R(A) <=> C) then pc++
-        lua_value &ta = _registers[ra];
-        if (arg_c ? ta.is_falsey() : !ta.is_falsey()) {
-          RL_quokka_vm_PC(ci_ref)++;
+        lua_value &ta = _registers[_ra];
+        if (_arg_c ? ta.is_falsey() : !ta.is_falsey()) {
+          RL_quokka_vm_PC(_ci_ref)++;
         } else {
           // Continue to next instruction (jmp)
         }
@@ -497,22 +495,22 @@ void quokka_vm::execute() {
       }
       case opcode::OP_TESTSET: {
         // if (R(B) <=> C) then R(A) = R(B) else pc++
-        lua_value &tb = _registers[base + opcode_util::val(arg_b)];
-        if (arg_c ? tb.is_falsey() : !tb.is_falsey()) {
-          RL_quokka_vm_PC(ci_ref)++;
+        lua_value &tb = _registers[_base + opcode_util::val(_arg_b)];
+        if (_arg_c ? tb.is_falsey() : !tb.is_falsey()) {
+          RL_quokka_vm_PC(_ci_ref)++;
         } else {
           // R(A) = R(B), do next jump
-          _registers.emplace(ra, tb);
+          _registers.emplace(_ra, tb);
           // Continue to next instruction (jmp)
         }
         break;
       }
       case opcode::OP_CALL: {
-        int nresults = arg_c - 1;
-        if (arg_b != 0) {
+        int nresults = _arg_c - 1;
+        if (_arg_b != 0) {
           // Set new top? This should be done already.
         }
-        if (!precall(ra, nresults)) {
+        if (!precall(_ra, nresults)) {
           // Lua Func
           goto new_call;
         }
@@ -521,7 +519,7 @@ void quokka_vm::execute() {
       case opcode::OP_TAILCALL: {
         // return R(A)(R(A+1) ... R(A+B-1))
         // -1 = multiret
-        if (!precall(ra, -1)) {
+        if (!precall(_ra, -1)) {
           // Lua function
           size_t oci_idx = _callinfo.size() - 2;
           lua_call &nci = _callinfo.last();                 // New, called frame
@@ -529,7 +527,7 @@ void quokka_vm::execute() {
 
           size_t lim = nci.info.lua.base + _registers[nci.func_idx].obj().get()->lclosure().proto->num_params;
 
-          if ((*cl_ref)->lclosure().proto->num_params > 0)
+          if ((*_cl_ref)->lclosure().proto->num_params > 0)
             close_upvals(oci.info.lua.base);
           
           // Move called frame into the caller
@@ -547,12 +545,12 @@ void quokka_vm::execute() {
         break;
       }
       case opcode::OP_RETURN: {
-        if ((*cl_ref)->lclosure().proto->num_protos > 0) {
+        if ((*_cl_ref)->lclosure().proto->num_protos > 0) {
           // Close upvals
-          close_upvals(base);
+          close_upvals(_base);
         }
-        postcall(ra, (arg_b != 0 ? (arg_b - 1) : (_registers.size() - ra)));
-        if ((*ci_ref)->callstatus & CALL_STATUS_FRESH)
+        postcall(_ra, (_arg_b != 0 ? (_arg_b - 1) : (_registers.size() - _ra)));
+        if ((*_ci_ref)->callstatus & CALL_STATUS_FRESH)
           return;   // Invoked externally, can just return
         else {
           goto new_call;
@@ -560,36 +558,36 @@ void quokka_vm::execute() {
       }
       case opcode::OP_FORLOOP: {
         // R(A) += R(A+2); if R(A) <?= R(A+1) then { pc += sBx; R(A+3) = R(A) }
-        if (_registers[ra].data.is<lua_integer>()) {
+        if (_registers[_ra].data.is<lua_integer>()) {
           // integer loop
-          lua_integer step = _registers[ra + 2].data.get<lua_integer>();
-          lua_integer idx = _registers[ra].data.get<lua_integer>() + step;
-          lua_integer limit = _registers[ra + 1].data.get<lua_integer>();
+          lua_integer step = _registers[_ra + 2].data.get<lua_integer>();
+          lua_integer idx = _registers[_ra].data.get<lua_integer>() + step;
+          lua_integer limit = _registers[_ra + 1].data.get<lua_integer>();
           if ( (step > 0) ? (idx <= limit) : (limit <= idx) ) {
             // Jump pc by sBx
-            RL_quokka_vm_PC(ci_ref) += opcode_util::get_sBx(instruction);
-            _registers.emplace(ra, lua_value(idx));
-            _registers.emplace(ra + 3, _registers[ra]);
+            RL_quokka_vm_PC(_ci_ref) += opcode_util::get_sBx(_instruction);
+            _registers.emplace(_ra, lua_value(idx));
+            _registers.emplace(_ra + 3, _registers[_ra]);
           }
         } else {
           // floating point loop
-          lua_number step = _registers[ra + 2].data.get<lua_number>();
-          lua_number idx = _registers[ra].data.get<lua_number>() + step;
-          lua_number limit = _registers[ra + 1].data.get<lua_number>();
+          lua_number step = _registers[_ra + 2].data.get<lua_number>();
+          lua_number idx = _registers[_ra].data.get<lua_number>() + step;
+          lua_number limit = _registers[_ra + 1].data.get<lua_number>();
           if ( (step > 0) ? (idx <= limit) : (limit <= idx) ) {
             // Jump pc by sBx
-            RL_quokka_vm_PC(ci_ref) += opcode_util::get_sBx(instruction);
-            _registers.emplace(ra, lua_value(idx));
-            _registers.emplace(ra + 3, _registers[ra]);
+            RL_quokka_vm_PC(_ci_ref) += opcode_util::get_sBx(_instruction);
+            _registers.emplace(_ra, lua_value(idx));
+            _registers.emplace(_ra + 3, _registers[_ra]);
           }
         }
         break;
       }
       case opcode::OP_FORPREP: {
         // R(A) -= R(A+2); pc += sBx
-        lua_value &init = _registers[ra];
-        lua_value &limit = _registers[ra + 1];
-        lua_value &step = _registers[ra + 2];
+        lua_value &init = _registers[_ra];
+        lua_value &limit = _registers[_ra + 1];
+        lua_value &step = _registers[_ra + 2];
 
         lua_integer int_limit;
         bool valid_int_limit = limit.tointeger(int_limit);
@@ -611,28 +609,28 @@ void quokka_vm::execute() {
           init.data.emplace<lua_number>(ninit - nstep);
           step.data.emplace<lua_number>(nstep);
         }
-        RL_quokka_vm_PC(ci_ref) += opcode_util::get_sBx(instruction);
+        RL_quokka_vm_PC(_ci_ref) += opcode_util::get_sBx(_instruction);
         break;
       }
       case opcode::OP_TFORCALL: {
         // R(A+3) ... R(A+2+C) = R(A)( R(A+1), R(A+2) )
         // Setup the R(A)( R(A+1), R(A+2) )
-        size_t call_base = ra + 3;
-        _registers.emplace(call_base + 2, _registers[ra + 2]);
-        _registers.emplace(call_base + 1, _registers[ra + 1]);
-        _registers.emplace(call_base, _registers[ra]);
-        // Expecting arg_c return values
-        if (!precall(call_base, arg_c))
+        size_t call_base = _ra + 3;
+        _registers.emplace(call_base + 2, _registers[_ra + 2]);
+        _registers.emplace(call_base + 1, _registers[_ra + 1]);
+        _registers.emplace(call_base, _registers[_ra]);
+        // Expecting _arg_c return values
+        if (!precall(call_base, _arg_c))
           execute();
         // Next instruction is OP_TFORLOOP, so let the loop go ahead
         break;
       }
       case opcode::OP_TFORLOOP: {
         // if R(A+1) ~= nil then { R(A) = R(A+1); pc += sBx }
-        lua_value &tv1 = _registers[ra + 1];
+        lua_value &tv1 = _registers[_ra + 1];
         if (!tv1.is_nil()) {
-          _registers.emplace(ra, tv1);
-          RL_quokka_vm_PC(ci_ref) += opcode_util::get_sBx(instruction);
+          _registers.emplace(_ra, tv1);
+          RL_quokka_vm_PC(_ci_ref) += opcode_util::get_sBx(_instruction);
         }
         break;
       }
@@ -645,24 +643,24 @@ void quokka_vm::execute() {
         // Note that if B == 0, b = reg top - ra - 1
         // Note also that if C == 0, c = extra arg as Ax
         size_t fpf = 50;
-        size_t b = arg_b;
-        size_t c = arg_c;
-        lua_table &table = _registers[ra].obj().get()->table();
+        size_t b = _arg_b;
+        size_t c = _arg_c;
+        lua_table &table = _registers[_ra].obj().get()->table();
 
         if (b == 0) {
           // b = reg top - ra - 1
-          b = _registers.size() - ra - 1;
+          b = _registers.size() - _ra - 1;
         }
         if (c == 0) {
           // Get extra arg
-          c = opcode_util::get_Ax(*(RL_quokka_vm_PC(ci_ref)++));
+          c = opcode_util::get_Ax(*(RL_quokka_vm_PC(_ci_ref)++));
         }
         size_t stack_pop = _registers.size() - b;
 
         // Work backwards, saves us assigning a new iterator var
         lua_integer table_idx = ((c - 1) * fpf + b);
         for (; b > 0; b--) {
-          table.set(table_idx--, _registers[ra + b]);
+          table.set(table_idx--, _registers[_ra + b]);
         }
 
         // Pop the stack constants
@@ -671,21 +669,21 @@ void quokka_vm::execute() {
       }
       case opcode::OP_CLOSURE: {
         // R(A) = closure(KPROTO[Bx])
-        lua_lclosure &this_closure = (*cl_ref)->lclosure();
-        bytecode_prototype &proto = *this_closure.proto->protos[bx];
-        object_store_ref cache = lclosure_cache(proto, base, cl_ref);
+        lua_lclosure &this_closure = (*_cl_ref)->lclosure();
+        bytecode_prototype &proto = *this_closure.proto->protos[opcode_util::get_Bx(_instruction)];
+        object_store_ref cache = lclosure_cache(proto, _base, _cl_ref);
         if (cache.is_valid()) {
-          _registers.emplace(ra, cache);
+          _registers.emplace(_ra, cache);
         } else {
-          _registers.emplace(ra, lclosure_new(proto, base, cl_ref));
+          _registers.emplace(_ra, lclosure_new(proto, _base, _cl_ref));
         }
         break;
       }
       case opcode::OP_VARARG: {
         // R(A) R(A+1) ... R(A+B-2) = vararg
         // b = required results
-        int b = arg_b - 1;
-        int n = (base - (*ci_ref)->func_idx) - (*cl_ref)->lclosure().proto->num_params - 1;
+        int b = _arg_b - 1;
+        int n = (_base - (*_ci_ref)->func_idx) - (*_cl_ref)->lclosure().proto->num_params - 1;
         // Less args than params
         if (n < 0)
           n = 0;
@@ -694,9 +692,9 @@ void quokka_vm::execute() {
         
         int j;
         for (j = 0; j < b && j < n; j++)
-          _registers.emplace(ra + j, _registers[base - n + j]);
+          _registers.emplace(_ra + j, _registers[_base - n + j]);
         for (; j < b; j++)
-          _registers.emplace(ra + j); // nil
+          _registers.emplace(_ra + j); // nil
         
         break;
       }
