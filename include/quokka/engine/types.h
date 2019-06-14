@@ -5,7 +5,7 @@
 
 #include "smallvector.h"
 #include "smallstring.h"
-#include "simplevariant.h"
+#include "variant.h"
 
 namespace quokka {
 namespace engine {
@@ -112,13 +112,6 @@ namespace engine {
   struct bytecode_prototype;
   class quokka_vm;
 
-  /* Variant hashes for value */
-  MAKE_VARIANT_HASH(bool, 1);
-  MAKE_VARIANT_HASH(lua_integer, 2);
-  MAKE_VARIANT_HASH(lua_number, 3);
-  MAKE_VARIANT_HASH(value_string_t, 4);
-  MAKE_VARIANT_HASH(object_store_ref, 5);
-
   /**
    * lua_value is the main container for data in Lua, containing the value of any variables
    * used in the program.
@@ -151,7 +144,7 @@ namespace engine {
      * string_t: String
      * object_store_ref: Ref to lua_object in object store
      */
-    simple_variant<bool, lua_number, lua_integer, string_t, object_store_ref> data;
+    optional_variant<bool, lua_number, lua_integer, string_t, object_store_ref> data;
 
     /**
      * Create a new lua_value of type Nil
@@ -336,11 +329,6 @@ namespace engine {
     func_t func;
   };
 
-  /* Variant hashes for object */
-  MAKE_VARIANT_HASH(lua_table, 16);
-  MAKE_VARIANT_HASH(lua_lclosure, 17);
-  MAKE_VARIANT_HASH(lua_native_closure, 18);
-
   /**
    * Lua objects are datatypes that are described by more than just their value. Unlike
    * numbers, strings, and booleans, objects can be complex, such as tables. 
@@ -353,7 +341,7 @@ namespace engine {
    * A value may hold an object (or rather, a reference to an object), but an object is not a value.
    */
   struct lua_object : public refcountable {
-    simple_variant<lua_table, lua_lclosure, lua_native_closure> data;
+    optional_variant<lua_table, lua_lclosure, lua_native_closure> data;
 
     lua_object();
 
@@ -368,10 +356,6 @@ namespace engine {
 
     void on_refcount_zero() override;
   };
-  
-  /* Variant hashes for upval */
-  MAKE_VARIANT_HASH(size_t, 20);
-  MAKE_VARIANT_HASH(lua_value, 21);
 
   /**
    * The Upval is a construct of Lua that allows for values to exist oustide of their
@@ -409,7 +393,7 @@ namespace engine {
      * size_t: Stack offset of upval when open
      * lua_value: Actual value of the upval when closed
      */
-    simple_variant<size_t, lua_value> value;
+    optional_variant<size_t, lua_value> value;
 
     void on_refcount_zero() override;
   };

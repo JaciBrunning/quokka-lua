@@ -3,11 +3,11 @@
 #include <stdint.h>
 #include <stddef.h>
 #include <istream>
+#include <memory>
 
 #include "smallstring.h"
 #include "smallvector.h"
 #include "types.h"
-#include "pointer.h"
 
 namespace quokka {
 namespace engine {
@@ -93,7 +93,7 @@ struct bytecode_prototype {
   /* Unfortunately this is recursive, so we have to 
      have some heap allocations */
   int num_protos;
-  small_vector<small_shared_ptr<bytecode_prototype>, 16> protos;
+  small_vector<std::shared_ptr<bytecode_prototype>, 16> protos;
   // Debugging information is ignored, but still must be parsed.
   
   /* RUNTIME INFO */
