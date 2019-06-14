@@ -23,6 +23,13 @@ int main() {
     return 0;
   });
 
+  v.define_native_function("native_type", [](quokka_vm &v) {
+    std::visit([&](auto &&t) {
+      v.push(typeid(std::decay<decltype(t)>()).name());
+    }, v.argument(0).data);
+    return 1;
+  });
+
   object_store_ref os = v.alloc_object();
   (*os)->table().set("clock", v.alloc_native_function([](quokka_vm &v) {
     v.push( (double)(clock()) / (double)(CLOCKS_PER_SEC) );

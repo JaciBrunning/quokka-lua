@@ -28,14 +28,14 @@ lua_table &lua_object::table() {
   return data.emplace<lua_table>();
 }
 
-lua_lclosure &lua_object::lclosure() {
-  if (data.is<lua_lclosure>())
-    return data.get<lua_lclosure>();
+lua_lua_closure &lua_object::lua_func() {
+  if (data.is<lua_lua_closure>())
+    return data.get<lua_lua_closure>();
 
-  return data.emplace<lua_lclosure>();
+  return data.emplace<lua_lua_closure>();
 }
 
-lua_native_closure &lua_object::native_closure() {
+lua_native_closure &lua_object::native_func() {
   if (data.is<lua_native_closure>())
     return data.get<lua_native_closure>();
 

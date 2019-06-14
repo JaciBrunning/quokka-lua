@@ -4,7 +4,6 @@ Quokka Lua Engine
 The Quokka Lua Engine (Quokka LE) is a runtime environment and transpiler for Lua bytecode.  
 
 Quokka LE is:
-- Small
 - Modern
 - Cross Platform
 - Stack Optimized
@@ -42,7 +41,7 @@ int main() {
 ## Differences from the PUC-RIO Lua VM
 | Feature | Quokka | PUC-RIO (lua.org) | Notes |
 | - | - | - | - |
-| API | C++11 | C99 | Quokka is built on C++11, and uses C++11 constructs in order to implement a modern VM. |
+| API | C++17 | C99 | Quokka is built on C++11, and uses C++17 constructs in order to implement a modern VM. |
 | VM Registers and Call Stack | Small Vector | Vector | Quokka uses Small Vectors, which are pre-allocated on the stack up to a certain size. When the vector needs to grow, it is moved onto the heap. This optimizes performance and memory footprint, and is the main advantage of Quokka. |
 | Bytecode Interpreter | Any source architecture | Source architecture must match running architecture | Quokka can understand bytecodes compiled on different architectures, although if the architectures do not match (i.e. a 64-bit program running on 32-bit), performance during bytecode parsing can drop. Quokka offers the ability to 'transpile' bytecode between architectures, allowing you to "cross compile" lua programs. As a bonus, transpiled bytecodes will run on a standard PUC-RIO installation. |
 | Threads | Not implemented | Present | Quokka is optimized for embedded platforms, with small memory regions. Threading implementations, including coroutines, yields, etc, all take up a large amount of binary space and are often not required in embedded systems. Threading requirements can be met using multiple instances of `quokka_vm` and handling synchronization through native function declarations. |

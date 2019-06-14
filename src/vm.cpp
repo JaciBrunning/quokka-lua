@@ -18,7 +18,7 @@ void quokka_vm::load(bytecode_chunk &bytecode) {
   // Add prototype to _rootprotos
   // Add closure to top of register stack (the root function)
   object_store_ref root_lua_func = alloc_object();
-  (*root_lua_func)->lclosure().proto = &bytecode.root_func;
+  (*root_lua_func)->lua_func().proto = &bytecode.root_func;
   _registers.emplace_back(root_lua_func);
   // Init upvals (closed)
   // bytecode.num_upvals and bytecode.root_proto.num_upvalues are always the same
@@ -30,7 +30,7 @@ void quokka_vm::load(bytecode_chunk &bytecode) {
       // Is _ENV
       // Distinguished env, apply to root function
       (*upv)->value.emplace<lua_value>(_distinguished_env);
-      (*root_lua_func)->lclosure().upval_refs.emplace(0, upv);
+      (*root_lua_func)->lua_func().upval_refs.emplace(0, upv);
     }
   }
 }
@@ -90,7 +90,7 @@ lua_table &quokka_vm::env() {
 
 object_store_ref quokka_vm::alloc_native_function(lua_native_closure::func_t f) {
   object_store_ref r = alloc_object();
-  r.get()->native_closure().func = f;
+  r.get()->native_func().func = f;
   return r;
 }
 
@@ -105,9 +105,9 @@ bool quokka_vm::precall(size_t func_stack_idx, int nreturn) {
   // object_store_ref func_ref = _registers[func_stack_idx].data.get<object_store_ref>();
   //lua_closure &closure = (*func_ref)->data.get<lua_closure>();
   lua_object &obj = *_registers[func_stack_idx].data.get<object_store_ref>().get();
-  if (obj.data.is<lua_lclosure>()) {
+  if (obj.data.is<lua_lua_closure>()) {
     // Lua closure
-    lua_lclosure &lcl = obj.lclosure();
+    lua_lua_closure &lcl = obj.lua_func();
     bytecode_prototype *proto = lcl.proto;
     // Actual number of arguments, not necessarily what's required
     size_t nargs = _registers.size() - func_stack_idx - 1;
@@ -145,7 +145,7 @@ bool quokka_vm::precall(size_t func_stack_idx, int nreturn) {
     return false;
   } else if (obj.data.is<lua_native_closure>()) {
     // Native closure
-    lua_native_closure &ncl = obj.native_closure();
+    lua_native_closure &ncl = obj.native_func();
     // Push a new call frame
     lua_call &ci = _callinfo.emplace_back();
     ci.callstatus = 0;
@@ -162,7 +162,7 @@ bool quokka_vm::precall(size_t func_stack_idx, int nreturn) {
 #define RL_quokka_vm_PC(ci_ref) ((*ci_ref)->info.lua.pc)
 // Obtain an upvalue
 #define RL_quokka_vm_UPV(i, target, cl_ref) { \
-  lua_upval *upv_ = (*cl_ref)->lclosure().upval_refs[i].get(); \
+  lua_upval *upv_ = (*cl_ref)->lua_func().upval_refs[i].get(); \
   target = upv_->value.is<size_t>() ? &_registers[upv_->value.get<size_t>()] : &upv_->value.get<lua_value>(); }
 // Decode a B or C register, using a constant value or stack value where appropriate
 // Note that lua quokka_vm indexes constants from 1, but upvalues from 0 for some reason.
@@ -175,7 +175,7 @@ void quokka_vm::execute() {
   _ci_ref = call_ref(&_callinfo, _callinfo.size() - 1);
   reg_ref cl_reg_ref(&_registers, (*_ci_ref)->func_idx);
   _cl_ref = (*cl_reg_ref)->data.get<object_store_ref>();
-  bytecode_prototype *proto = (*_cl_ref)->lclosure().proto;
+  bytecode_prototype *proto = (*_cl_ref)->lua_func().proto;
   _base = (*_ci_ref)->info.lua.base;
 
   while (true) {
@@ -525,9 +525,9 @@ void quokka_vm::execute() {
           lua_call &nci = _callinfo.last();                 // New, called frame
           lua_call &oci = _callinfo[oci_idx];  // Caller frame
 
-          size_t lim = nci.info.lua.base + _registers[nci.func_idx].obj().get()->lclosure().proto->num_params;
+          size_t lim = nci.info.lua.base + _registers[nci.func_idx].obj().get()->lua_func().proto->num_params;
 
-          if ((*_cl_ref)->lclosure().proto->num_params > 0)
+          if ((*_cl_ref)->lua_func().proto->num_params > 0)
             close_upvals(oci.info.lua.base);
           
           // Move called frame into the caller
@@ -545,7 +545,7 @@ void quokka_vm::execute() {
         break;
       }
       case opcode::OP_RETURN: {
-        if ((*_cl_ref)->lclosure().proto->num_protos > 0) {
+        if ((*_cl_ref)->lua_func().proto->num_protos > 0) {
           // Close upvals
           close_upvals(_base);
         }
@@ -669,7 +669,7 @@ void quokka_vm::execute() {
       }
       case opcode::OP_CLOSURE: {
         // R(A) = closure(KPROTO[Bx])
-        lua_lclosure &this_closure = (*_cl_ref)->lclosure();
+        lua_lua_closure &this_closure = (*_cl_ref)->lua_func();
         bytecode_prototype &proto = *this_closure.proto->protos[opcode_util::get_Bx(_instruction)];
         object_store_ref cache = lclosure_cache(proto, _base, _cl_ref);
         if (cache.is_valid()) {
@@ -683,7 +683,7 @@ void quokka_vm::execute() {
         // R(A) R(A+1) ... R(A+B-2) = vararg
         // b = required results
         int b = _arg_b - 1;
-        int n = (_base - (*_ci_ref)->func_idx) - (*_cl_ref)->lclosure().proto->num_params - 1;
+        int n = (_base - (*_ci_ref)->func_idx) - (*_cl_ref)->lua_func().proto->num_params - 1;
         // Less args than params
         if (n < 0)
           n = 0;
@@ -790,7 +790,7 @@ object_store_ref quokka_vm::lclosure_cache(bytecode_prototype &proto, size_t bas
 object_store_ref quokka_vm::lclosure_new(bytecode_prototype &proto, size_t base, object_store_ref parent_cl) {
   int num_upval = proto.num_upvalues;
   object_store_ref new_closure = alloc_object();
-  lua_lclosure &ncl = (*new_closure)->lclosure();
+  lua_lua_closure &ncl = (*new_closure)->lua_func();
   ncl.proto = &proto;
   
   // Assign each upval
@@ -820,7 +820,7 @@ object_store_ref quokka_vm::lclosure_new(bytecode_prototype &proto, size_t base,
       }
     } else {
       // Use upval from parent function
-      ncl.upval_refs.emplace(i, (*parent_cl)->lclosure().upval_refs[v.idx]);
+      ncl.upval_refs.emplace(i, (*parent_cl)->lua_func().upval_refs[v.idx]);
     }
   }
 

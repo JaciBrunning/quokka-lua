@@ -190,7 +190,7 @@ namespace engine {
      * Is this value numeric? (Integer or Decimal Number)
      */
     inline bool is_numeric() const {
-      return data.is<lua_number>() || data.is<lua_integer>();
+      return is<lua_number>(data) || is<lua_integer>(data);
     }
 
     /**
@@ -312,10 +312,10 @@ namespace engine {
   };
 
   /**
-   * lua_lclosure is the implementation of a closure (function) implemented in Lua, including
+   * lua_lua_closure is the implementation of a closure (function) implemented in Lua, including
    * references to its upvals and bytecode prototype.
    */
-  struct lua_lclosure {
+  struct lua_lua_closure {
     bytecode_prototype *proto;
     small_vector<upval_ref, 4> upval_refs;
   };
@@ -341,13 +341,13 @@ namespace engine {
    * A value may hold an object (or rather, a reference to an object), but an object is not a value.
    */
   struct lua_object : public refcountable {
-    optional_variant<lua_table, lua_lclosure, lua_native_closure> data;
+    optional_variant<lua_table, lua_lua_closure, lua_native_closure> data;
 
     lua_object();
 
     lua_table &table();
-    lua_lclosure &lclosure();
-    lua_native_closure &native_closure();
+    lua_lua_closure &lua_func();
+    lua_native_closure &native_func();
 
     lua_tag_type get_tag_type() const;
 
