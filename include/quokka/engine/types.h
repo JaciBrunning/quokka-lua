@@ -106,7 +106,7 @@ namespace engine {
   /**
    * String type for values
    */
-  using value_string_t = small_string<32>;
+  using value_string_t = small_string<16>;
 
   // Fwd decls
   struct bytecode_prototype;
@@ -292,7 +292,7 @@ namespace engine {
 
       node(const lua_value &k, const lua_value &v) : key(k), value(v) {}
     };
-    small_vector<node, 16> entries;
+    small_vector<node, 8> entries;
 
     /**
      * Get a value from the table by key.

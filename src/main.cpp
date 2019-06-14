@@ -7,6 +7,11 @@ using namespace quokka::engine;
 #include <time.h>
 
 int main() {
+  std::cout << "sizeof(vm) " << sizeof(quokka_vm) << std::endl;
+  std::cout << "sizeof(lua_value) " << sizeof(lua_value) << std::endl;
+  std::cout << "sizeof(lua_object) " << sizeof(lua_object) << std::endl;
+  std::cout << "sizeof(lua_upval) " << sizeof(lua_upval) << std::endl;
+
   std::ifstream bytecode_in("luac.out");
   bytecode_reader reader(bytecode_in);
 

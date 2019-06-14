@@ -2,3 +2,6 @@
 build/
 /quokka
 *.out
+*.gpr
+*.lock*
+*.rep/

@@ -167,9 +167,9 @@ namespace engine {
     small_vector<lua_call, 16> _callinfo;
     // Upval storage - used for variables that transcend the normal scope. 
     // e.g. local variables in ownership by an anonymous function
-    small_vector<lua_upval, 16> _upvals;
+    small_vector<lua_upval, 2, 4> _upvals;
     // Store for objects
-    small_vector<lua_object, 16> _objects;
+    small_vector<lua_object, 8> _objects;
 
     /**
      * In Lua, all loaded files have a single upvalue - the _ENV (environment).

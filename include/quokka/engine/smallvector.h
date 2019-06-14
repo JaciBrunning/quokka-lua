@@ -130,15 +130,17 @@ class small_vector : public small_vector_base<T> {
   T& emplace(size_t pos, Args&&... args) {
     if (pos < this->_size) {
       (&raw_buffer()[pos])->~T();
+    } else {
+      while (pos >= _alloced_size)
+        grow(this->_size + GROW_BY);
     }
-
-    while (pos >= _alloced_size)
-      grow(this->_size + GROW_BY);
     
     T* place = &raw_buffer()[pos];
     new(place) T(std::forward<Args>(args)...);
+
     if (pos >= this->_size)
-      this->_size++;
+      this->_size = pos + 1;
+    
     return *place;
   }
 
