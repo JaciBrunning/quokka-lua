@@ -62,6 +62,17 @@ namespace engine {
     }
 
     /**
+     * Obtain the contents of the string as a C string. Note that, if 
+     * this string grows, the pointer becomes invalid.
+     * 
+     * @return A pointer to the content as a C string, terminated by 
+     * a null byte (\0).
+     */
+    const char *c_str() const {
+      return this->raw_buffer();
+    }
+
+    /**
      * Concatenate a character to the string. Respects the null byte.
      */
     void concat(char c) {

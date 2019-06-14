@@ -85,7 +85,7 @@ void quokka_vm::pop(size_t num) {
 }
 
 lua_table &quokka_vm::env() {
-  return _distinguished_env.data.get<object_store_ref>().get()->table();
+  return std::get<object_store_ref>(_distinguished_env.data).get()->table();
 }
 
 object_store_ref quokka_vm::alloc_native_function(lua_native_closure::func_t f) {
@@ -102,10 +102,10 @@ void quokka_vm::define_native_function(const lua_value &key, lua_native_closure:
 
 bool quokka_vm::precall(size_t func_stack_idx, int nreturn) {
   // TODO: Meta method, see ldo.c luaD_precall
-  // object_store_ref func_ref = _registers[func_stack_idx].data.get<object_store_ref>();
-  //lua_closure &closure = (*func_ref)->data.get<lua_closure>();
-  lua_object &obj = *_registers[func_stack_idx].data.get<object_store_ref>().get();
-  if (obj.data.is<lua_lua_closure>()) {
+  // object_store_ref func_ref = _registers[func_stack_idx].std::get<object_store_ref>(data);
+  //lua_closure &closure = (*func_ref)->std::get<lua_closure>(data);
+  lua_object &obj = *std::get<object_store_ref>(_registers[func_stack_idx].data).get();
+  if (is<lua_lua_closure>(obj.data)) {
     // Lua closure
     lua_lua_closure &lcl = obj.lua_func();
     bytecode_prototype *proto = lcl.proto;
@@ -143,7 +143,7 @@ bool quokka_vm::precall(size_t func_stack_idx, int nreturn) {
     ci.info.lua.base = base;
     ci.info.lua.pc = &proto->instructions[0];   // TODO: Should this be a pointer?
     return false;
-  } else if (obj.data.is<lua_native_closure>()) {
+  } else if (is<lua_native_closure>(obj.data)) {
     // Native closure
     lua_native_closure &ncl = obj.native_func();
     // Push a new call frame
@@ -163,7 +163,7 @@ bool quokka_vm::precall(size_t func_stack_idx, int nreturn) {
 // Obtain an upvalue
 #define RL_quokka_vm_UPV(i, target, cl_ref) { \
   lua_upval *upv_ = (*cl_ref)->lua_func().upval_refs[i].get(); \
-  target = upv_->value.is<size_t>() ? &_registers[upv_->value.get<size_t>()] : &upv_->value.get<lua_value>(); }
+  target = is<size_t>(upv_->value) ? &_registers[std::get<size_t>(upv_->value)] : &std::get<lua_value>(upv_->value); }
 // Decode a B or C register, using a constant value or stack value where appropriate
 // Note that lua quokka_vm indexes constants from 1, but upvalues from 0 for some reason.
 #define RL_quokka_vm_RK(v) (opcode_util::is_const(v) ? proto->constants[opcode_util::val(v)] : _registers[_base + opcode_util::val(v)])
@@ -174,7 +174,7 @@ void quokka_vm::execute() {
   ;
   _ci_ref = call_ref(&_callinfo, _callinfo.size() - 1);
   reg_ref cl_reg_ref(&_registers, (*_ci_ref)->func_idx);
-  _cl_ref = (*cl_reg_ref)->data.get<object_store_ref>();
+  _cl_ref = std::get<object_store_ref>((*cl_reg_ref)->data);
   bytecode_prototype *proto = (*_cl_ref)->lua_func().proto;
   _base = (*_ci_ref)->info.lua.base;
 
@@ -274,8 +274,8 @@ void quokka_vm::execute() {
         lua_value &nb = RL_quokka_vm_RK(_arg_b);
         lua_value &nc = RL_quokka_vm_RK(_arg_c);
         lua_number lnb, lnc;
-        if (nb.data.is<lua_integer>() && nc.data.is<lua_integer>()) {
-          lua_integer result = nb.data.get<lua_integer>() + nc.data.get<lua_integer>();
+        if (is<lua_integer>(nb.data) && is<lua_integer>(nc.data)) {
+          lua_integer result = std::get<lua_integer>(nb.data) + std::get<lua_integer>(nc.data);
           _registers.emplace(_ra, result);
         } else if (nb.tonumber(lnb) && nc.tonumber(lnc)) {
           _registers.emplace(_ra, lnb + lnc);
@@ -287,8 +287,8 @@ void quokka_vm::execute() {
         lua_value &nb = RL_quokka_vm_RK(_arg_b);
         lua_value &nc = RL_quokka_vm_RK(_arg_c);
         lua_number lnb, lnc;
-        if (nb.data.is<lua_integer>() && nc.data.is<lua_integer>()) {
-          lua_integer result = nb.data.get<lua_integer>() - nc.data.get<lua_integer>();
+        if (is<lua_integer>(nb.data) && is<lua_integer>(nc.data)) {
+          lua_integer result = std::get<lua_integer>(nb.data) - std::get<lua_integer>(nc.data);
           _registers.emplace(_ra, result);
         } else if (nb.tonumber(lnb) && nc.tonumber(lnc)) {
           _registers.emplace(_ra, lnb - lnc);
@@ -300,8 +300,8 @@ void quokka_vm::execute() {
         lua_value &nb = RL_quokka_vm_RK(_arg_b);
         lua_value &nc = RL_quokka_vm_RK(_arg_c);
         lua_number lnb, lnc;
-        if (nb.data.is<lua_integer>() && nc.data.is<lua_integer>()) {
-          lua_integer result = nb.data.get<lua_integer>() * nc.data.get<lua_integer>();
+        if (is<lua_integer>(nb.data) && is<lua_integer>(nc.data)) {
+          lua_integer result = std::get<lua_integer>(nb.data) * std::get<lua_integer>(nc.data);
           _registers.emplace(_ra, result);
         } else if (nb.tonumber(lnb) && nc.tonumber(lnc)) {
           _registers.emplace(_ra, lnb * lnc);
@@ -313,8 +313,8 @@ void quokka_vm::execute() {
         lua_value &nb = RL_quokka_vm_RK(_arg_b);
         lua_value &nc = RL_quokka_vm_RK(_arg_c);
         lua_number lnb, lnc;
-        if (nb.data.is<lua_integer>() && nc.data.is<lua_integer>()) {
-          lua_integer result = nb.data.get<lua_integer>() % nc.data.get<lua_integer>();
+        if (is<lua_integer>(nb.data) && is<lua_integer>(nc.data)) {
+          lua_integer result = std::get<lua_integer>(nb.data) % std::get<lua_integer>(nc.data);
           _registers.emplace(_ra, result);
         } else if (nb.tonumber(lnb) && nc.tonumber(lnc)) {
           _registers.emplace(_ra, fmod(lnb, lnc));
@@ -336,8 +336,8 @@ void quokka_vm::execute() {
         lua_value &nb = RL_quokka_vm_RK(_arg_b);
         lua_value &nc = RL_quokka_vm_RK(_arg_c);
         lua_number lnb, lnc;
-        if (nb.data.is<lua_integer>() && nc.data.is<lua_integer>()) {
-          lua_integer result = nb.data.get<lua_integer>() / nc.data.get<lua_integer>();
+        if (is<lua_integer>(nb.data) && is<lua_integer>(nc.data)) {
+          lua_integer result = std::get<lua_integer>(nb.data) / std::get<lua_integer>(nc.data);
           _registers.emplace(_ra, result);
         } else if (nb.tonumber(lnb) && nc.tonumber(lnc)) {
           _registers.emplace(_ra, lnb / lnc);
@@ -349,8 +349,8 @@ void quokka_vm::execute() {
         lua_value &nb = RL_quokka_vm_RK(_arg_b);
         lua_value &nc = RL_quokka_vm_RK(_arg_c);
         lua_number lnb, lnc;
-        if (nb.data.is<lua_integer>() && nc.data.is<lua_integer>()) {
-          lua_integer result = nb.data.get<lua_integer>() / nc.data.get<lua_integer>();
+        if (is<lua_integer>(nb.data) && is<lua_integer>(nc.data)) {
+          lua_integer result = std::get<lua_integer>(nb.data) / std::get<lua_integer>(nc.data);
           _registers.emplace(_ra, result);
         } else if (nb.tonumber(lnb) && nc.tonumber(lnc)) {
           _registers.emplace(_ra, (lua_integer)(lnb / lnc));
@@ -361,8 +361,8 @@ void quokka_vm::execute() {
         // R(A) = RK(B) + RK(C)
         lua_value &nb = RL_quokka_vm_RK(_arg_b);
         lua_value &nc = RL_quokka_vm_RK(_arg_c);
-        if (nb.data.is<lua_integer>() && nc.data.is<lua_integer>()) {
-          lua_integer result = nb.data.get<lua_integer>() & nc.data.get<lua_integer>();
+        if (is<lua_integer>(nb.data) && is<lua_integer>(nc.data)) {
+          lua_integer result = std::get<lua_integer>(nb.data) & std::get<lua_integer>(nc.data);
           _registers.emplace(_ra, result);
         }
         break;
@@ -371,8 +371,8 @@ void quokka_vm::execute() {
         // R(A) = RK(B) | RK(C)
         lua_value &nb = RL_quokka_vm_RK(_arg_b);
         lua_value &nc = RL_quokka_vm_RK(_arg_c);
-        if (nb.data.is<lua_integer>() && nc.data.is<lua_integer>()) {
-          lua_integer result = nb.data.get<lua_integer>() | nc.data.get<lua_integer>();
+        if (is<lua_integer>(nb.data) && is<lua_integer>(nc.data)) {
+          lua_integer result = std::get<lua_integer>(nb.data) | std::get<lua_integer>(nc.data);
           _registers.emplace(_ra, result);
         }
         break;
@@ -381,8 +381,8 @@ void quokka_vm::execute() {
         // R(A) = RK(B) ~ RK(C)
         lua_value &nb = RL_quokka_vm_RK(_arg_b);
         lua_value &nc = RL_quokka_vm_RK(_arg_c);
-        if (nb.data.is<lua_integer>() && nc.data.is<lua_integer>()) {
-          lua_integer result = nb.data.get<lua_integer>() ^ nc.data.get<lua_integer>();
+        if (is<lua_integer>(nb.data) && is<lua_integer>(nc.data)) {
+          lua_integer result = std::get<lua_integer>(nb.data) ^ std::get<lua_integer>(nc.data);
           _registers.emplace(_ra, result);
         }
         break;
@@ -391,8 +391,8 @@ void quokka_vm::execute() {
         // R(A) = RK(B) << RK(C)
         lua_value &nb = RL_quokka_vm_RK(_arg_b);
         lua_value &nc = RL_quokka_vm_RK(_arg_c);
-        if (nb.data.is<lua_integer>() && nc.data.is<lua_integer>()) {
-          lua_integer result = nb.data.get<lua_integer>() << nc.data.get<lua_integer>();
+        if (is<lua_integer>(nb.data) && is<lua_integer>(nc.data)) {
+          lua_integer result = std::get<lua_integer>(nb.data) << std::get<lua_integer>(nc.data);
           _registers.emplace(_ra, result);
         }
         break;
@@ -401,8 +401,8 @@ void quokka_vm::execute() {
         // R(A) = RK(B) >> RK(C)
         lua_value &nb = RL_quokka_vm_RK(_arg_b);
         lua_value &nc = RL_quokka_vm_RK(_arg_c);
-        if (nb.data.is<lua_integer>() && nc.data.is<lua_integer>()) {
-          lua_integer result = nb.data.get<lua_integer>() >> nc.data.get<lua_integer>();
+        if (is<lua_integer>(nb.data) && is<lua_integer>(nc.data)) {
+          lua_integer result = std::get<lua_integer>(nb.data) >> std::get<lua_integer>(nc.data);
           _registers.emplace(_ra, result);
         }
         break;
@@ -411,8 +411,8 @@ void quokka_vm::execute() {
         // R(A) = -R(B)
         lua_value &n = _registers[_base + opcode_util::val(_arg_b)];
         lua_number ln;
-        if (n.data.is<lua_integer>()) {
-          _registers.emplace(_ra, -n.data.get<lua_integer>());
+        if (is<lua_integer>(n.data)) {
+          _registers.emplace(_ra, -std::get<lua_integer>(n.data));
         } else if (n.tonumber(ln)) {
           _registers.emplace(_ra, -ln);
         }
@@ -437,11 +437,11 @@ void quokka_vm::execute() {
       case opcode::OP_LEN: {
         // R(A) = length of R(B)
         lua_value &n = _registers[_base + opcode_util::val(_arg_b)];
-        if (n.data.is<lua_value::string_t>()) {
-          _registers.emplace(_ra, (lua_integer) n.data.get<lua_value::string_t>().size());
-        } else if (n.data.is<object_store_ref>()) {
+        if (is<lua_value::string_t>(n.data)) {
+          _registers.emplace(_ra, (lua_integer) std::get<lua_value::string_t>(n.data).size());
+        } else if (is<object_store_ref>(n.data)) {
           object_store_ref o = n.obj();
-          if (o.get()->data.is<lua_table>()) {
+          if (is<lua_table>(o.get()->data)) {
             _registers.emplace(_ra, (lua_integer) o.get()->table().entries.size());
           }
         }
@@ -452,7 +452,7 @@ void quokka_vm::execute() {
         if (_ra != _base + _arg_b)
           _registers.emplace(_ra, _registers[_base + _arg_b]);
         for (size_t i = _base + _arg_b + 1; i <= _base + _arg_c; i++)
-          _registers[_ra].data.get<lua_value::string_t>().concat_str(_registers[i].tostring());
+          std::get<lua_value::string_t>(_registers[_ra].data).concat_str(_registers[i].tostring());
         break;
       }
       case opcode::OP_JMP: {
@@ -558,11 +558,11 @@ void quokka_vm::execute() {
       }
       case opcode::OP_FORLOOP: {
         // R(A) += R(A+2); if R(A) <?= R(A+1) then { pc += sBx; R(A+3) = R(A) }
-        if (_registers[_ra].data.is<lua_integer>()) {
+        if (is<lua_integer>(_registers[_ra].data)) {
           // integer loop
-          lua_integer step = _registers[_ra + 2].data.get<lua_integer>();
-          lua_integer idx = _registers[_ra].data.get<lua_integer>() + step;
-          lua_integer limit = _registers[_ra + 1].data.get<lua_integer>();
+          lua_integer step = std::get<lua_integer>(_registers[_ra + 2].data);
+          lua_integer idx = std::get<lua_integer>(_registers[_ra].data) + step;
+          lua_integer limit = std::get<lua_integer>(_registers[_ra + 1].data);
           if ( (step > 0) ? (idx <= limit) : (limit <= idx) ) {
             // Jump pc by sBx
             RL_quokka_vm_PC(_ci_ref) += opcode_util::get_sBx(_instruction);
@@ -571,9 +571,9 @@ void quokka_vm::execute() {
           }
         } else {
           // floating point loop
-          lua_number step = _registers[_ra + 2].data.get<lua_number>();
-          lua_number idx = _registers[_ra].data.get<lua_number>() + step;
-          lua_number limit = _registers[_ra + 1].data.get<lua_number>();
+          lua_number step = std::get<lua_number>(_registers[_ra + 2].data);
+          lua_number idx = std::get<lua_number>(_registers[_ra].data) + step;
+          lua_number limit = std::get<lua_number>(_registers[_ra + 1].data);
           if ( (step > 0) ? (idx <= limit) : (limit <= idx) ) {
             // Jump pc by sBx
             RL_quokka_vm_PC(_ci_ref) += opcode_util::get_sBx(_instruction);
@@ -592,9 +592,9 @@ void quokka_vm::execute() {
         lua_integer int_limit;
         bool valid_int_limit = limit.tointeger(int_limit);
 
-        if (init.data.is<lua_integer>() && step.data.is<lua_integer>() && valid_int_limit) {
-          lua_integer istep = step.data.get<lua_integer>();
-          lua_integer iinit = init.data.get<lua_integer>();
+        if (is<lua_integer>(init.data) && is<lua_integer>(step.data) && valid_int_limit) {
+          lua_integer istep = std::get<lua_integer>(step.data);
+          lua_integer iinit = std::get<lua_integer>(init.data);
           
           limit.data.emplace<lua_integer>(int_limit);
           init.data.emplace<lua_integer>(iinit - istep);
@@ -754,8 +754,8 @@ void quokka_vm::close_upvals(size_t level) {
   for (size_t i = 0; i < _upvals.size(); i++) {
     lua_upval &uv = _upvals[i];
     // Ensure upval is open
-    if (!uv.is_free && uv.value.is<size_t>()) {
-      size_t stack_idx = uv.value.get<size_t>();
+    if (!uv.is_free && is<size_t>(uv.value)) {
+      size_t stack_idx = std::get<size_t>(uv.value);
       if (level <= stack_idx) {
         // Close upval
         uv.value.emplace<lua_value>(_registers[stack_idx]);
@@ -803,8 +803,8 @@ object_store_ref quokka_vm::lclosure_new(bytecode_prototype &proto, size_t base,
       for (size_t i = 0; i < _upvals.size() && !upval_found; i++) {
         lua_upval &uv = _upvals[i];
         // Ensure upval is open
-        if (!uv.is_free && uv.value.is<size_t>()) {
-          size_t stack_idx = uv.value.get<size_t>();
+        if (!uv.is_free && is<size_t>(uv.value)) {
+          size_t stack_idx = std::get<size_t>(uv.value);
           if (stack_idx == level) {
             ncl.upval_refs.emplace(i, upval_ref(&_upvals, i));
             upval_found = true;

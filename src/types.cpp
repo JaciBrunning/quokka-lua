@@ -19,43 +19,43 @@ void refcountable::unuse() {
 }
 
 lua_object::lua_object() {
-  data.unassign();
+  unassign(data);
 }
 
 lua_table &lua_object::table() {
-  if (data.is<lua_table>())
-    return data.get<lua_table>();
+  if (is<lua_table>(data))
+    return std::get<lua_table>(data);
   return data.emplace<lua_table>();
 }
 
 lua_lua_closure &lua_object::lua_func() {
-  if (data.is<lua_lua_closure>())
-    return data.get<lua_lua_closure>();
+  if (is<lua_lua_closure>(data))
+    return std::get<lua_lua_closure>(data);
 
   return data.emplace<lua_lua_closure>();
 }
 
 lua_native_closure &lua_object::native_func() {
-  if (data.is<lua_native_closure>())
-    return data.get<lua_native_closure>();
+  if (is<lua_native_closure>(data))
+    return std::get<lua_native_closure>(data);
 
   return data.emplace<lua_native_closure>();
 }
 
 lua_tag_type lua_object::get_tag_type() const {
-  if (!data.is_assigned())
+  if (!is_assigned(data))
     return lua_tag_type::NIL;
-  if (data.is<lua_table>())
+  if (is<lua_table>(data))
     return lua_tag_type::TABLE;
   return lua_tag_type::FUNC;
 }
 
 void lua_object::on_refcount_zero() {
-  data.unassign();
+  unassign(data);
 }
 
 lua_value::lua_value() {
-  data.unassign();
+  unassign(data);
 }
 
 lua_value::lua_value(bool b) {
@@ -79,40 +79,40 @@ lua_value::lua_value(const char *s) {
 }
 
 lua_tag_type lua_value::get_tag_type() const {
-  if (!data.is_assigned()) return lua_tag_type::NIL;
-  if (data.is<bool>())
+  if (!is_assigned(data)) return lua_tag_type::NIL;
+  if (is<bool>(data))
     return lua_tag_type::BOOL;
-  if (data.is<lua_number>() || data.is<lua_integer>())
+  if (is<lua_number>(data) || is<lua_integer>(data))
     return lua_tag_type::NUMBER;
-  if (data.is<lua_value::string_t>())
+  if (is<lua_value::string_t>(data))
     return lua_tag_type::STRING;
   // Is object
-  return data.get<object_store_ref>().get()->get_tag_type();
+  return std::get<object_store_ref>(data).get()->get_tag_type();
 }
 
 bool lua_value::is_nil() const {
-  return !data.is_assigned();
+  return !is_assigned(data);
 }
 
 bool lua_value::is_falsey() const {
-  return is_nil() || (data.is<bool>() && !data.get<bool>());
+  return is_nil() || (is<bool>(data) && !std::get<bool>(data));
 }
 
 object_store_ref lua_value::obj() const {
-  return data.get<object_store_ref>();
+  return std::get<object_store_ref>(data);
 }
 
 bool lua_value::tonumber(lua_number &out) const {
-  if (data.is<lua_number>()) {
-    out = data.get<lua_number>();
+  if (is<lua_number>(data)) {
+    out = std::get<lua_number>(data);
     return true;
-  } else if (data.is<lua_integer>()) {
-    out = (lua_number) data.get<lua_integer>();
+  } else if (is<lua_integer>(data)) {
+    out = (lua_number) std::get<lua_integer>(data);
     return true;
-  } else if (data.is<lua_value::string_t>()) {
+  } else if (is<lua_value::string_t>(data)) {
     // Try to parse string
     char *end;
-    lua_number n = strtod(data.get<lua_value::string_t>().c_str(), &end);
+    lua_number n = strtod(std::get<lua_value::string_t>(data).c_str(), &end);
     if (*end != '\0')
       return false;
     out = n;
@@ -123,8 +123,8 @@ bool lua_value::tonumber(lua_number &out) const {
 
 bool lua_value::tointeger(lua_integer &out) const {
   lua_number n;
-  if (data.is<lua_integer>()) {
-    out = data.get<lua_integer>();
+  if (is<lua_integer>(data)) {
+    out = std::get<lua_integer>(data);
     return true;
   } else if (tonumber(n)) {
     // Safe for doubles to be converted to int
@@ -142,19 +142,19 @@ bool lua_value::tointeger(lua_integer &out) const {
 bool lua_value::tostring(string_t &out) const {
   char buf[16];
   out.clear();
-  if (data.is<lua_value::string_t>()) {
-    out.concat_str(data.get<lua_value::string_t>());
+  if (is<lua_value::string_t>(data)) {
+    out.concat_str(std::get<lua_value::string_t>(data));
     return true;
-  } else if (data.is<lua_integer>()) {
-    snprintf(buf, 16, "%d", data.get<lua_integer>());
+  } else if (is<lua_integer>(data)) {
+    snprintf(buf, 16, "%d", std::get<lua_integer>(data));
     out.concat(buf);
     return true;
-  } else if (data.is<lua_number>()) {
-    snprintf(buf, 16, "%f", data.get<lua_number>());
+  } else if (is<lua_number>(data)) {
+    snprintf(buf, 16, "%f", std::get<lua_number>(data));
     out.concat(buf);
     return true;
-  } else if (data.is<bool>()) {
-    out.concat(data.get<bool>() ? "true" : "false");
+  } else if (is<bool>(data)) {
+    out.concat(std::get<bool>(data) ? "true" : "false");
     return true;
   } else if (is_nil()) {
     out.concat("nil");
@@ -170,22 +170,22 @@ bool lua_value::operator==(const lua_value &other) const {
   if (get_tag_type() != other.get_tag_type()) return false;
   // nil has no data
   if (get_tag_type() != lua_tag_type::NIL) {
-    if (data.is<bool>())
-      return data.get<bool>() == other.data.get<bool>();
-    else if (data.is<lua_number>())
-      return data.get<lua_number>() == other.data.get<lua_number>();
-    else if (data.is<lua_integer>())
-      return data.get<lua_integer>() == other.data.get<lua_integer>();
-    else if (data.is<string_t>()) {
+    if (is<bool>(data))
+      return std::get<bool>(data) == std::get<bool>(other.data);
+    else if (is<lua_number>(data))
+      return std::get<lua_number>(data) == std::get<lua_number>(other.data);
+    else if (is<lua_integer>(data))
+      return std::get<lua_integer>(data) == std::get<lua_integer>(other.data);
+    else if (is<string_t>(data)) {
       // Compare string values
-      string_t &a = data.get<string_t>(), &b = other.data.get<string_t>();
+      const string_t &a = std::get<string_t>(data), &b = std::get<string_t>(other.data);
       if (a.length() != b.length()) return false;
       for (size_t i = 0; i < a.length(); i++)
         if (a[i] != b[i])
           return false;
     } else {
       // Object
-      return data.get<object_store_ref>() == other.data.get<object_store_ref>();
+      return std::get<object_store_ref>(data) == std::get<object_store_ref>(other.data);
     }
   }
 
@@ -197,8 +197,8 @@ bool lua_value::operator<(const lua_value &other) const {
     lua_number na, nb;
     if (this->tonumber(na) && other.tonumber(nb)) {
       return na < nb;
-    } else if (data.is<string_t>()) {
-      int strc = strcmp(data.get<string_t>().c_str(), other.data.get<string_t>().c_str());
+    } else if (is<string_t>(data)) {
+      int strc = strcmp(std::get<string_t>(data).c_str(), std::get<string_t>(other.data).c_str());
       return strc < 0;
     }
   }
@@ -210,8 +210,8 @@ bool lua_value::operator<=(const lua_value &other) const {
     lua_number na, nb;
     if (this->tonumber(na) && other.tonumber(nb)) {
       return na <= nb;
-    } else if (data.is<string_t>()) {
-      int strc = strcmp(data.get<string_t>().c_str(), other.data.get<string_t>().c_str());
+    } else if (is<string_t>(data)) {
+      int strc = strcmp(std::get<string_t>(data).c_str(), std::get<string_t>(other.data).c_str());
       return strc <= 0;
     }
   }
@@ -238,5 +238,5 @@ void lua_table::set(const lua_value &k, const lua_value &v) {
 }
 
 void lua_upval::on_refcount_zero() {
-  value.unassign();
+  unassign(value);
 }

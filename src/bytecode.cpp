@@ -163,7 +163,7 @@ void bytecode_reader::read_function(bytecode_architecture arch, bytecode_prototy
     } else if (ltt == lua_tag_type::STRING) {
       lua_value &val = func.constants.emplace_back("");
       // read_lua_string(*this, arch, *val.value_string());
-      read_lua_string(*this, arch, val.data.get<lua_value::string_t>());
+      read_lua_string(*this, arch, std::get<lua_value::string_t>(val.data));
     }
   }
 
@@ -333,18 +333,18 @@ void bytecode_writer::write_function(bytecode_prototype &func) {
     // TODO: this needs to be sanitized according to ldump.c
     uint8_t tag_type = (uint8_t)tv.get_tag_type();
     // Special case - Tag type 3 (number) is 19 for integers.
-    if (tv.data.is<lua_integer>()) tag_type = 19;
+    if (is<lua_integer>(tv.data)) tag_type = 19;
     write_byte(tag_type);
     lua_tag_type t = tv.get_tag_type();
     if (t == lua_tag_type::BOOL) {
-      write_byte(tv.data.get<bool>() ? 1 : 0);
+      write_byte(std::get<bool>(tv.data) ? 1 : 0);
     } else if (t == lua_tag_type::NUMBER) {
-      if (tv.data.is<lua_integer>())
-        write_lua_integer(tv.data.get<lua_integer>());
+      if (is<lua_integer>(tv.data))
+        write_lua_integer(std::get<lua_integer>(tv.data));
       else
-        write_lua_number(tv.data.get<lua_number>());
+        write_lua_number(std::get<lua_number>(tv.data));
     } else if (t == lua_tag_type::STRING) {
-      write_lua_string(*this, tv.data.get<lua_value::string_t>());
+      write_lua_string(*this, std::get<lua_value::string_t>(tv.data));
     }
   }
 

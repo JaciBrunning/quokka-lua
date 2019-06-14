@@ -122,11 +122,11 @@ namespace engine {
    * 
    * The type of the lua_value can be determined using one of the following methods:
    *    - is_* functions
-   *    - data.is<type>()
-   * For example, `value.is_numeric()` or `value.data.is<bool>()`
+   *    - is<type>(data)
+   * For example, `value.is_numeric()` or `is<bool>(value.data)`
    * 
    * The value of the lua_value can be obtained through one of the following methods.
-   *    - data.get<type>()    Note this does NOT check the data type, you should check the type prior to calling
+   *    - std::get<type>(data)    Note this does NOT check the data type, you should check the type prior to calling
    *    - obj()->get()        Shortcut for accessing an object, through which table and function types can be accessed.
    *                          Note that this does not check data type.
    *    - to* conversion functions  Convert types if applicable. These do perform type checking and coercion where necessary
@@ -196,25 +196,25 @@ namespace engine {
     /**
      * Is this value an integer?
      */
-    inline bool is_integer() const { return data.is<lua_integer>(); }
+    inline bool is_integer() const { return is<lua_integer>(data); }
     /**
      * Is this value a decimal? (Number)
      */
-    inline bool is_decimal() const { return data.is<lua_number>(); }
+    inline bool is_decimal() const { return is<lua_number>(data); }
     
     /**
      * Is this value a boolean?
      */
-    inline bool is_bool() const { return data.is<bool>(); }
+    inline bool is_bool() const { return is<bool>(data); }
     /**
      * Is this value a string?
      */
-    inline bool is_string() const { return data.is<string_t>(); }
+    inline bool is_string() const { return is<string_t>(data); }
 
     /**
      * Is this value an object? (Table or Function)
      */
-    inline bool is_object() const { return data.is<object_store_ref>(); }
+    inline bool is_object() const { return is<object_store_ref>(data); }
 
     /**
      * Get the value of this lua_value as an object.
@@ -351,7 +351,7 @@ namespace engine {
 
     lua_tag_type get_tag_type() const;
 
-    inline bool is_table() const { return data.is<lua_table>(); }
+    inline bool is_table() const { return is<lua_table>(data); }
     inline bool is_function() const { return !is_table(); };
 
     void on_refcount_zero() override;
