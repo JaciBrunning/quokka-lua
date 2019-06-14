@@ -47,3 +47,6 @@ int main() {
 | Threads | Not implemented | Present | Quokka is optimized for embedded platforms, with small memory regions. Threading implementations, including coroutines, yields, etc, all take up a large amount of binary space and are often not required in embedded systems. Threading requirements can be met using multiple instances of `quokka_vm` and handling synchronization through native function declarations. |
 | Metatables | Not implemented | Present | Metatables are not present in Quokka at this time. They have been forgone in the interest of size optimization. |
 | Debugging Information | Removed | Present\* | Quokka discards debugging information. \*: PUC-RIO can strip bytecode information with `luac -s`, which is the equivilent of the Quokka bytecode parser's approach to Debugging information |
+
+## TODO
+- Can we make lua_value just a std::variant, and do all the funcs outside? Could improve use of the std library (e.g. std::visit)
