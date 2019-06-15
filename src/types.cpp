@@ -83,58 +83,6 @@ bool ::quokka::engine::tostring(const lua_value &v, lua_string &out) {
   return ret;
 }
 
-// bool lua_value::operator==(const lua_value &other) const {
-//   if (get_tag_type() != other.get_tag_type()) return false;
-//   // nil has no data
-//   if (get_tag_type() != lua_tag_type::NIL) {
-//     if (is<bool>(data))
-//       return std::get<bool>(data) == std::get<bool>(other.data);
-//     else if (is<lua_number>(data))
-//       return std::get<lua_number>(data) == std::get<lua_number>(other.data);
-//     else if (is<lua_integer>(data))
-//       return std::get<lua_integer>(data) == std::get<lua_integer>(other.data);
-//     else if (is<string_t>(data)) {
-//       // Compare string values
-//       const string_t &a = std::get<string_t>(data), &b = std::get<string_t>(other.data);
-//       if (a.length() != b.length()) return false;
-//       for (size_t i = 0; i < a.length(); i++)
-//         if (a[i] != b[i])
-//           return false;
-//     } else {
-//       // Object
-//       return std::get<object_view>(data) == std::get<object_view>(other.data);
-//     }
-//   }
-
-//   return true;
-// }
-
-// bool lua_value::operator<(const lua_value &other) const {
-//   if (get_tag_type() == other.get_tag_type()) {
-//     lua_number na, nb;
-//     if (this->tonumber(na) && other.tonumber(nb)) {
-//       return na < nb;
-//     } else if (is<string_t>(data)) {
-//       int strc = strcmp(std::get<string_t>(data).c_str(), std::get<string_t>(other.data).c_str());
-//       return strc < 0;
-//     }
-//   }
-//   return false;
-// }
-
-// bool lua_value::operator<=(const lua_value &other) const {
-//   if (get_tag_type() == other.get_tag_type()) {
-//     lua_number na, nb;
-//     if (this->tonumber(na) && other.tonumber(nb)) {
-//       return na <= nb;
-//     } else if (is<string_t>(data)) {
-//       int strc = strcmp(std::get<string_t>(data).c_str(), std::get<string_t>(other.data).c_str());
-//       return strc <= 0;
-//     }
-//   }
-//   return false;
-// }
-
 lua_value lua_table::get(const lua_value &key) const {
   for (size_t i = 0; i < entries.size(); i++) {
     if (entries[i].key == key)
