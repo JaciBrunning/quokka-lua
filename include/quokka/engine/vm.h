@@ -64,8 +64,8 @@ namespace engine {
      */
     void load(bytecode_chunk &bc);
 
-    object_store_ref alloc_object();
-    upval_ref alloc_upval();
+    object_view alloc_object();
+    upval_view alloc_upval();
 
     /**
      * Call a function on the stack.
@@ -138,7 +138,7 @@ namespace engine {
      * Allocate a native function, ready to be put into the global env or other lua_value.
      * This is a quick way to define a new native function.
      */
-    object_store_ref alloc_native_function(lua_native_closure::func_t f);
+    object_view alloc_native_function(lua_native_closure::func_t f);
 
     /**
      * Define a native function, placed into the global env. This is a shortcut
@@ -160,8 +160,8 @@ namespace engine {
     bool postcall(size_t first_result_idx, int nreturn);
 
     void close_upvals(size_t level);
-    object_store_ref lclosure_cache(bytecode_prototype &proto, size_t func_base, object_store_ref parent_cl);
-    object_store_ref lclosure_new(bytecode_prototype &proto, size_t func_base, object_store_ref parent_cl);
+    object_view lclosure_cache(bytecode_prototype &proto, size_t func_base, object_view parent_cl);
+    object_view lclosure_new(bytecode_prototype &proto, size_t func_base, object_view parent_cl);
 
     small_vector<lua_value, 48> _registers;
     small_vector<lua_call, 16> _callinfo;
@@ -193,7 +193,7 @@ namespace engine {
     size_t _ra;
 
     call_ref _ci_ref;
-    object_store_ref _cl_ref;
+    object_view _cl_ref;
     size_t _base;
   };
 }

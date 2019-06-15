@@ -70,8 +70,8 @@ lua_value::lua_value(lua_number n) {
   data.emplace<lua_number>(n);
 }
 
-lua_value::lua_value(object_store_ref ref) {
-  data.emplace<object_store_ref>(ref);
+lua_value::lua_value(object_view ref) {
+  data.emplace<object_view>(ref);
 }
 
 lua_value::lua_value(const char *s) {
@@ -87,7 +87,7 @@ lua_tag_type lua_value::get_tag_type() const {
   if (is<lua_value::string_t>(data))
     return lua_tag_type::STRING;
   // Is object
-  return std::get<object_store_ref>(data).get()->get_tag_type();
+  return std::get<object_view>(data).get()->get_tag_type();
 }
 
 bool lua_value::is_nil() const {
@@ -98,8 +98,8 @@ bool lua_value::is_falsey() const {
   return is_nil() || (is<bool>(data) && !std::get<bool>(data));
 }
 
-object_store_ref lua_value::obj() const {
-  return std::get<object_store_ref>(data);
+object_view lua_value::obj() const {
+  return std::get<object_view>(data);
 }
 
 bool lua_value::tonumber(lua_number &out) const {
@@ -185,7 +185,7 @@ bool lua_value::operator==(const lua_value &other) const {
           return false;
     } else {
       // Object
-      return std::get<object_store_ref>(data) == std::get<object_store_ref>(other.data);
+      return std::get<object_view>(data) == std::get<object_view>(other.data);
     }
   }
 

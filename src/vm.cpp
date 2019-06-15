@@ -7,7 +7,7 @@ using namespace quokka::engine;
 
 quokka_vm::quokka_vm() {
   // Load distinguished env.
-  object_store_ref objstore = alloc_object();
+  object_view objstore = alloc_object();
   (*objstore)->table().set("__QUOKKA_LE__", "0.0.1");
   _distinguished_env = lua_value(objstore);
 }
@@ -17,42 +17,42 @@ void quokka_vm::load(bytecode_chunk &bytecode) {
 
   // Add prototype to _rootprotos
   // Add closure to top of register stack (the root function)
-  object_store_ref root_lua_func = alloc_object();
+  object_view root_lua_func = alloc_object();
   (*root_lua_func)->lua_func().proto = &bytecode.root_func;
   _registers.emplace_back(root_lua_func);
   // Init upvals (closed)
   // bytecode.num_upvals and bytecode.root_proto.num_upvalues are always the same
   for (size_t i = 0; i < bytecode.num_upvalues; i++) {
-    upval_ref upv = alloc_upval();
+    upval_view upv = alloc_upval();
     (*upv)->value.emplace<lua_value>();  // nil
 
     if (i == 0) {
       // Is _ENV
       // Distinguished env, apply to root function
       (*upv)->value.emplace<lua_value>(_distinguished_env);
-      (*root_lua_func)->lua_func().upval_refs.emplace(0, upv);
+      (*root_lua_func)->lua_func().upval_views.emplace(0, upv);
     }
   }
 }
 
-object_store_ref quokka_vm::alloc_object() {
+object_view quokka_vm::alloc_object() {
   for (size_t i = 0; i < _objects.size(); i++) {
     if (_objects[i].is_free)
-      return object_store_ref(&_objects, i);
+      return object_view(&_objects, i);
   }
   // Didn't find a free slot, emplace an object and use that.
   _objects.emplace_back();
-  return object_store_ref(&_objects, _objects.size() - 1);
+  return object_view(&_objects, _objects.size() - 1);
 }
 
-upval_ref quokka_vm::alloc_upval() {
+upval_view quokka_vm::alloc_upval() {
   for (size_t i = 0; i < _upvals.size(); i++) {
     if (_upvals[i].is_free)
-      return upval_ref(&_upvals, i);
+      return upval_view(&_upvals, i);
   }
   // Didn't find a free slot, emplace an upval and use that
   _upvals.emplace_back();
-  return upval_ref(&_upvals, _upvals.size() - 1);
+  return upval_view(&_upvals, _upvals.size() - 1);
 }
 
 void quokka_vm::call(size_t nargs, int nreturn) {
@@ -85,11 +85,11 @@ void quokka_vm::pop(size_t num) {
 }
 
 lua_table &quokka_vm::env() {
-  return std::get<object_store_ref>(_distinguished_env.data).get()->table();
+  return std::get<object_view>(_distinguished_env.data).get()->table();
 }
 
-object_store_ref quokka_vm::alloc_native_function(lua_native_closure::func_t f) {
-  object_store_ref r = alloc_object();
+object_view quokka_vm::alloc_native_function(lua_native_closure::func_t f) {
+  object_view r = alloc_object();
   r.get()->native_func().func = f;
   return r;
 }
@@ -102,9 +102,9 @@ void quokka_vm::define_native_function(const lua_value &key, lua_native_closure:
 
 bool quokka_vm::precall(size_t func_stack_idx, int nreturn) {
   // TODO: Meta method, see ldo.c luaD_precall
-  // object_store_ref func_ref = _registers[func_stack_idx].std::get<object_store_ref>(data);
+  // object_view func_ref = _registers[func_stack_idx].std::get<object_view>(data);
   //lua_closure &closure = (*func_ref)->std::get<lua_closure>(data);
-  lua_object &obj = *std::get<object_store_ref>(_registers[func_stack_idx].data).get();
+  lua_object &obj = *std::get<object_view>(_registers[func_stack_idx].data).get();
   if (is<lua_lua_closure>(obj.data)) {
     // Lua closure
     lua_lua_closure &lcl = obj.lua_func();
@@ -162,7 +162,7 @@ bool quokka_vm::precall(size_t func_stack_idx, int nreturn) {
 #define RL_quokka_vm_PC(ci_ref) ((*ci_ref)->info.lua.pc)
 // Obtain an upvalue
 #define RL_quokka_vm_UPV(i, target, cl_ref) { \
-  lua_upval *upv_ = (*cl_ref)->lua_func().upval_refs[i].get(); \
+  lua_upval *upv_ = (*cl_ref)->lua_func().upval_views[i].get(); \
   target = is<size_t>(upv_->value) ? &_registers[std::get<size_t>(upv_->value)] : &std::get<lua_value>(upv_->value); }
 // Decode a B or C register, using a constant value or stack value where appropriate
 // Note that lua quokka_vm indexes constants from 1, but upvalues from 0 for some reason.
@@ -174,7 +174,7 @@ void quokka_vm::execute() {
   ;
   _ci_ref = call_ref(&_callinfo, _callinfo.size() - 1);
   reg_ref cl_reg_ref(&_registers, (*_ci_ref)->func_idx);
-  _cl_ref = std::get<object_store_ref>((*cl_reg_ref)->data);
+  _cl_ref = std::get<object_view>((*cl_reg_ref)->data);
   bytecode_prototype *proto = (*_cl_ref)->lua_func().proto;
   _base = (*_ci_ref)->info.lua.base;
 
@@ -244,7 +244,7 @@ void quokka_vm::execute() {
       case opcode::OP_SETUPVAL: {
         // Upval[B] = R(A)
         // NOTE: Assigns to stack value
-        // lua_upval *upv = (*cl_ref)->lclosure().upval_refs[arg_a].get();
+        // lua_upval *upv = (*cl_ref)->lclosure().upval_views[arg_a].get();
         // upv->value.emplace<size_t>(ra);
         lua_value *tv;
         RL_quokka_vm_UPV(_arg_b, tv, _cl_ref);
@@ -257,7 +257,7 @@ void quokka_vm::execute() {
         break;
       case opcode::OP_NEWTABLE: {
         // R(A) = {} (size = B,C)
-        object_store_ref objref = alloc_object();
+        object_view objref = alloc_object();
         (*objref)->table();
         _registers.emplace(_ra, objref);
         break;
@@ -439,8 +439,8 @@ void quokka_vm::execute() {
         lua_value &n = _registers[_base + opcode_util::val(_arg_b)];
         if (is<lua_value::string_t>(n.data)) {
           _registers.emplace(_ra, (lua_integer) std::get<lua_value::string_t>(n.data).size());
-        } else if (is<object_store_ref>(n.data)) {
-          object_store_ref o = n.obj();
+        } else if (is<object_view>(n.data)) {
+          object_view o = n.obj();
           if (is<lua_table>(o.get()->data)) {
             _registers.emplace(_ra, (lua_integer) o.get()->table().entries.size());
           }
@@ -671,7 +671,7 @@ void quokka_vm::execute() {
         // R(A) = closure(KPROTO[Bx])
         lua_lua_closure &this_closure = (*_cl_ref)->lua_func();
         bytecode_prototype &proto = *this_closure.proto->protos[opcode_util::get_Bx(_instruction)];
-        object_store_ref cache = lclosure_cache(proto, _base, _cl_ref);
+        object_view cache = lclosure_cache(proto, _base, _cl_ref);
         if (cache.is_valid()) {
           _registers.emplace(_ra, cache);
         } else {
@@ -764,8 +764,8 @@ void quokka_vm::close_upvals(size_t level) {
   }
 }
 
-object_store_ref quokka_vm::lclosure_cache(bytecode_prototype &proto, size_t base, object_store_ref parent_cl) {
-  object_store_ref cl_ref = proto.closure_cache;
+object_view quokka_vm::lclosure_cache(bytecode_prototype &proto, size_t base, object_view parent_cl) {
+  object_view cl_ref = proto.closure_cache;
   if (cl_ref.is_valid()) {
     int num_upval = proto.num_upvalues;
     for (int i = 0; i < num_upval; i++) {
@@ -781,15 +781,15 @@ object_store_ref quokka_vm::lclosure_cache(bytecode_prototype &proto, size_t bas
       }
 
       if (!(tval_cache == tval_target))
-        return object_store_ref(); // upvalues don't match
+        return object_view(); // upvalues don't match
     }
   }
   return cl_ref;
 }
 
-object_store_ref quokka_vm::lclosure_new(bytecode_prototype &proto, size_t base, object_store_ref parent_cl) {
+object_view quokka_vm::lclosure_new(bytecode_prototype &proto, size_t base, object_view parent_cl) {
   int num_upval = proto.num_upvalues;
-  object_store_ref new_closure = alloc_object();
+  object_view new_closure = alloc_object();
   lua_lua_closure &ncl = (*new_closure)->lua_func();
   ncl.proto = &proto;
   
@@ -806,7 +806,7 @@ object_store_ref quokka_vm::lclosure_new(bytecode_prototype &proto, size_t base,
         if (!uv.is_free && is<size_t>(uv.value)) {
           size_t stack_idx = std::get<size_t>(uv.value);
           if (stack_idx == level) {
-            ncl.upval_refs.emplace(i, upval_ref(&_upvals, i));
+            ncl.upval_views.emplace(i, upval_view(&_upvals, i));
             upval_found = true;
           }
         }
@@ -814,13 +814,13 @@ object_store_ref quokka_vm::lclosure_new(bytecode_prototype &proto, size_t base,
 
       // Upval could not be found - make a new one
       if (!upval_found) {
-        upval_ref uvr = alloc_upval();
+        upval_view uvr = alloc_upval();
         (*uvr)->value.emplace<size_t>(level);
-        ncl.upval_refs.emplace(i, uvr);
+        ncl.upval_views.emplace(i, uvr);
       }
     } else {
       // Use upval from parent function
-      ncl.upval_refs.emplace(i, (*parent_cl)->lua_func().upval_refs[v.idx]);
+      ncl.upval_views.emplace(i, (*parent_cl)->lua_func().upval_views[v.idx]);
     }
   }
 

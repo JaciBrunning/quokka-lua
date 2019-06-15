@@ -98,7 +98,7 @@ struct bytecode_prototype {
   
   /* RUNTIME INFO */
   /* This is used by the runtime to cache the closure. It has no bytecode purpose */
-  object_store_ref closure_cache;
+  object_view closure_cache;
 };
 
 /**

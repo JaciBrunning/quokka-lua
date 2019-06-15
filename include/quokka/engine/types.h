@@ -46,6 +46,8 @@ namespace engine {
    */
   class refcountable {
    public:
+    virtual ~refcountable() = default;
+
     bool is_free = true;
     int refcount = 0;
 
@@ -60,23 +62,23 @@ namespace engine {
   struct lua_upval;
 
   /**
-   * store_refcountable is a generic form of iterator that points to a store that may change
+   * view_refcountable is a generic form of iterator that points to a store that may change
    * size, and thus invalidate any typical iterator types (e.g. T*). See continuous_reference<T> 
    * for more details.
    */
   template<typename T>
-  struct store_refcountable : public continuous_reference<T> {
-    store_refcountable() : continuous_reference<T>(nullptr, 0) {}
+  struct view_refcountable : public continuous_reference<T> {
+    view_refcountable() : continuous_reference<T>(nullptr, 0) {}
 
-    store_refcountable(small_vector_base<T> *v, size_t id) : continuous_reference<T>(v, id) {
+    view_refcountable(small_vector_base<T> *v, size_t id) : continuous_reference<T>(v, id) {
       if (continuous_reference<T>::is_valid())
         continuous_reference<T>::get()->use();
     }
 
-    store_refcountable(const store_refcountable &other) : store_refcountable(other.vec, other.idx) {}
-    store_refcountable(store_refcountable &&other) : store_refcountable(other.vec, other.idx) {}
+    view_refcountable(const view_refcountable &other) : view_refcountable(other.vec, other.idx) {}
+    view_refcountable(view_refcountable &&other) : view_refcountable(other.vec, other.idx) {}
 
-    store_refcountable &operator=(const store_refcountable &other) {
+    view_refcountable &operator=(const view_refcountable &other) {
       if (continuous_reference<T>::is_valid())
         continuous_reference<T>::get()->unuse();
       
@@ -89,7 +91,7 @@ namespace engine {
       return *this;
     }
 
-    ~store_refcountable() {
+    ~view_refcountable() {
       if (continuous_reference<T>::is_valid())
         continuous_reference<T>::get()->unuse();
     }
@@ -98,11 +100,11 @@ namespace engine {
   /**
    * Storage reference for objects
    */
-  using object_store_ref = store_refcountable<lua_object>;
+  using object_view = view_refcountable<lua_object>;
   /**
    * Storage reference for upvals
    */
-  using upval_ref = store_refcountable<lua_upval>;
+  using upval_view = view_refcountable<lua_upval>;
   /**
    * String type for values
    */
@@ -142,9 +144,9 @@ namespace engine {
      * lua_number: Number (float)
      * lua_integer: Number (integer)
      * string_t: String
-     * object_store_ref: Ref to lua_object in object store
+     * object_view: Ref to lua_object in object store
      */
-    optional_variant<bool, lua_number, lua_integer, string_t, object_store_ref> data;
+    optional_variant<bool, lua_number, lua_integer, string_t, object_view> data;
 
     /**
      * Create a new lua_value of type Nil
@@ -165,7 +167,7 @@ namespace engine {
     /**
      * Create a new lua_value of type Object
      */
-    lua_value(object_store_ref);   // Obj (table, function)
+    lua_value(object_view);   // Obj (table, function)
     /**
      * Create a new lua_value of type String
      */
@@ -214,12 +216,12 @@ namespace engine {
     /**
      * Is this value an object? (Table or Function)
      */
-    inline bool is_object() const { return is<object_store_ref>(data); }
+    inline bool is_object() const { return is<object_view>(data); }
 
     /**
      * Get the value of this lua_value as an object.
      */
-    object_store_ref obj() const;
+    object_view obj() const;
 
     /**
      * Convert this value to a number. Can convert a number, integer, or
@@ -317,7 +319,7 @@ namespace engine {
    */
   struct lua_lua_closure {
     bytecode_prototype *proto;
-    small_vector<upval_ref, 4> upval_refs;
+    small_vector<upval_view, 4> upval_views;
   };
 
   /**

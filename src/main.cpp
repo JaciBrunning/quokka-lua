@@ -32,7 +32,7 @@ int main() {
     return 1;
   });
   
-  object_store_ref os = v.alloc_object();
+  object_view os = v.alloc_object();
   (*os)->table().set("clock", v.alloc_native_function([](quokka_vm &v) {
     v.push( (double)(clock()) / (double)(CLOCKS_PER_SEC) );
     return 1;
