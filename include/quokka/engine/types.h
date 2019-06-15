@@ -127,6 +127,10 @@ namespace engine {
 
   lua_tag_type get_tag_type(const lua_value &v);
   
+  constexpr bool is_numeric(const lua_value &v) {
+    return is<lua_integer>(v) || is<lua_number>(v);
+  }
+
   bool tonumber(const lua_value &v, lua_number &out);
   bool tointeger(const lua_value &v, lua_integer &out);
   bool tostring(const lua_value &v, lua_string &out);
@@ -156,6 +160,59 @@ namespace engine {
   inline bool falsey(const lua_value &val) {
     return is<lua_nil>(val) || (is<bool>(val) && !std::get<bool>(val));
   }
+
+  inline bool operator==(const lua_value &a, const lua_value &b) {
+    if (a.index() == b.index() || (is_numeric(a) && is_numeric(b))) {
+      return std::visit(overloaded {
+        [&](auto &av) -> bool {
+          return av == std::get<typename std::decay<decltype(av)>::type>(b);
+        },
+        [&](lua_integer av) -> bool {
+          return av == (is<lua_integer>(b) ? std::get<lua_integer>(b) : std::get<lua_number>(b));
+        },
+        [&](lua_number av) -> bool {
+          return av == (is<lua_integer>(b) ? std::get<lua_integer>(b) : std::get<lua_number>(b));
+        }
+      }, a);
+    }
+    return false;
+  }
+
+  inline bool operator!=(const lua_value &a, const lua_value &b) {
+    return !(a == b);
+  }
+
+  inline bool operator<(const lua_value &a, const lua_value &b) {
+    lua_number na, nb;
+    if (a.index() == b.index() || (is_numeric(a) && is_numeric(b))) {
+      if (tonumber(a, na) && tonumber(b, nb)) {
+        return na < nb;
+      } else if (is<lua_string>(a)) {
+        return std::get<lua_string>(a) < std::get<lua_string>(b);
+      }
+    }
+    return false;
+  }
+
+  inline bool operator<=(const lua_value &a, const lua_value &b) {
+    lua_number na, nb;
+    if (a.index() == b.index() || (is_numeric(a) && is_numeric(b))) {
+      if (tonumber(a, na) && tonumber(b, nb)) {
+        return na <= nb;
+      } else if (is<lua_string>(a)) {
+        return std::get<lua_string>(a) <= std::get<lua_string>(b);
+      }
+    }
+    return false;
+  }
+
+  inline bool operator>(const lua_value &a, const lua_value &b) {
+    return b < a;
+  }
+
+  inline bool operator>=(const lua_value &a, const lua_value &b) {
+    return b <= a;
+  }
   
   /**
    * A lua_table is the implementation of the Lua table datatype, allowing for a key-value store.
@@ -174,6 +231,10 @@ namespace engine {
     };
     small_vector<node, 8> entries;
 
+    inline lua_value get(const char *str) {
+      return get(lua_string{str});
+    }
+
     /**
      * Get a value from the table by key.
      * 
@@ -181,6 +242,10 @@ namespace engine {
      * @return The value of the entry
      */
     lua_value get(const lua_value &k) const;
+
+    inline void set(const char *strk, const char *strv) { set(lua_string{strk}, lua_string{strv}); }
+    inline void set(const lua_value &k, const char *strv) { set(k, lua_string{strv}); }
+    inline void set(const char *strk, const lua_value &v) { set(lua_string{strk}, v); }
 
     /**
      * Set a value in the table by key.

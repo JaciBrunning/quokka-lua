@@ -148,6 +148,10 @@ namespace engine {
      * @param f The native function, as a lambda, C function, or other std::function type.
      */
     void define_native_function(const lua_value &key, lua_native_closure::func_t f);
+
+    inline void define_native_function(const char *key, lua_native_closure::func_t f) {
+      define_native_function(lua_string{key}, f);
+    }
     
    private:
     using call_ref = continuous_reference<lua_call>;

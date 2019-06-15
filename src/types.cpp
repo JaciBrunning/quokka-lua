@@ -25,10 +25,10 @@ void lua_object::on_refcount_zero() {
 bool ::quokka::engine::tonumber(const lua_value &v, lua_number &out) {
   bool ret = true;
   std::visit(overloaded {
-    [&](auto&&) { ret = false; },
+    [&](auto &&) { ret = false; },
     [&](lua_integer i) { out = (lua_number) i; },
     [&](lua_number f) { out = f; },
-    [&](lua_string &s) {
+    [&](lua_string s) {
       char *end;
       lua_number n = strtod(s.c_str(), &end);
       if (*end != '\0')
@@ -62,7 +62,7 @@ bool ::quokka::engine::tostring(const lua_value &v, lua_string &out) {
   bool ret = true;
   std::visit(overloaded {
     [&](auto&&) { ret = false; },
-    [&](lua_string &s) { out.clear(); out.concat_str(s); },
+    [&](lua_string s) { out.clear(); out.concat_str(s); },
     [&](std::monostate) { out.clear(); out.concat("nil"); },
     [&](lua_integer i) {
       snprintf(buf, 16, "%d", i);
@@ -75,7 +75,7 @@ bool ::quokka::engine::tostring(const lua_value &v, lua_string &out) {
     [&](bool b) {
       out.clear(); out.concat(b ? "true" : "false");
     },
-    [&](object_view &v) {
+    [&](object_view v) {
       out.clear();
       out.concat((*v).is_table() ? "table: <unknown>" : "function: <unknown>");
     }

@@ -488,7 +488,7 @@ void quokka_vm::execute() {
       case opcode::OP_TEST: {
         // if not (R(A) <=> C) then pc++
         lua_value &ta = _registers[_ra];
-        if (_arg_c ? ta.is_falsey() : !ta.is_falsey()) {
+        if (_arg_c ? falsey(ta) : !falsey(ta)) {
           RL_quokka_vm_PC(_ci_ref)++;
         } else {
           // Continue to next instruction (jmp)
@@ -498,7 +498,7 @@ void quokka_vm::execute() {
       case opcode::OP_TESTSET: {
         // if (R(B) <=> C) then R(A) = R(B) else pc++
         lua_value &tb = _registers[_base + opcode_util::val(_arg_b)];
-        if (_arg_c ? tb.is_falsey() : !tb.is_falsey()) {
+        if (_arg_c ? falsey(tb) : !falsey(tb)) {
           RL_quokka_vm_PC(_ci_ref)++;
         } else {
           // R(A) = R(B), do next jump
@@ -527,9 +527,9 @@ void quokka_vm::execute() {
           lua_call &nci = _callinfo.last();                 // New, called frame
           lua_call &oci = _callinfo[oci_idx];  // Caller frame
 
-          size_t lim = nci.info.lua.base + _registers[nci.func_idx].obj().get()->lua_func().proto->num_params;
+          size_t lim = nci.info.lua.base + lua_func(_registers[nci.func_idx]).proto->num_params;
 
-          if ((*_cl_ref)->lua_func().proto->num_params > 0)
+          if (lua_func(_cl_ref).proto->num_params > 0)
             close_upvals(oci.info.lua.base);
           
           // Move called frame into the caller
@@ -547,12 +547,12 @@ void quokka_vm::execute() {
         break;
       }
       case opcode::OP_RETURN: {
-        if ((*_cl_ref)->lua_func().proto->num_protos > 0) {
+        if (lua_func(_cl_ref).proto->num_protos > 0) {
           // Close upvals
           close_upvals(_base);
         }
         postcall(_ra, (_arg_b != 0 ? (_arg_b - 1) : (_registers.size() - _ra)));
-        if ((*_ci_ref)->callstatus & CALL_STATUS_FRESH)
+        if ((*_ci_ref).callstatus & CALL_STATUS_FRESH)
           return;   // Invoked externally, can just return
         else {
           goto new_call;
@@ -560,11 +560,11 @@ void quokka_vm::execute() {
       }
       case opcode::OP_FORLOOP: {
         // R(A) += R(A+2); if R(A) <?= R(A+1) then { pc += sBx; R(A+3) = R(A) }
-        if (is<lua_integer>(_registers[_ra].data)) {
+        if (is<lua_integer>(_registers[_ra])) {
           // integer loop
-          lua_integer step = std::get<lua_integer>(_registers[_ra + 2].data);
-          lua_integer idx = std::get<lua_integer>(_registers[_ra].data) + step;
-          lua_integer limit = std::get<lua_integer>(_registers[_ra + 1].data);
+          lua_integer step = std::get<lua_integer>(_registers[_ra + 2]);
+          lua_integer idx = std::get<lua_integer>(_registers[_ra]) + step;
+          lua_integer limit = std::get<lua_integer>(_registers[_ra + 1]);
           if ( (step > 0) ? (idx <= limit) : (limit <= idx) ) {
             // Jump pc by sBx
             RL_quokka_vm_PC(_ci_ref) += opcode_util::get_sBx(_instruction);
@@ -573,9 +573,9 @@ void quokka_vm::execute() {
           }
         } else {
           // floating point loop
-          lua_number step = std::get<lua_number>(_registers[_ra + 2].data);
-          lua_number idx = std::get<lua_number>(_registers[_ra].data) + step;
-          lua_number limit = std::get<lua_number>(_registers[_ra + 1].data);
+          lua_number step = std::get<lua_number>(_registers[_ra + 2]);
+          lua_number idx = std::get<lua_number>(_registers[_ra]) + step;
+          lua_number limit = std::get<lua_number>(_registers[_ra + 1]);
           if ( (step > 0) ? (idx <= limit) : (limit <= idx) ) {
             // Jump pc by sBx
             RL_quokka_vm_PC(_ci_ref) += opcode_util::get_sBx(_instruction);
@@ -592,24 +592,24 @@ void quokka_vm::execute() {
         lua_value &step = _registers[_ra + 2];
 
         lua_integer int_limit;
-        bool valid_int_limit = limit.tointeger(int_limit);
+        bool valid_int_limit = tointeger(limit, int_limit);
 
-        if (is<lua_integer>(init.data) && is<lua_integer>(step.data) && valid_int_limit) {
-          lua_integer istep = std::get<lua_integer>(step.data);
-          lua_integer iinit = std::get<lua_integer>(init.data);
+        if (is<lua_integer>(init) && is<lua_integer>(step) && valid_int_limit) {
+          lua_integer istep = std::get<lua_integer>(step);
+          lua_integer iinit = std::get<lua_integer>(init);
           
-          limit.data.emplace<lua_integer>(int_limit);
-          init.data.emplace<lua_integer>(iinit - istep);
+          limit.emplace<lua_integer>(int_limit);
+          init.emplace<lua_integer>(iinit - istep);
         } else {
           // Try making everything a float
           lua_number nlimit, ninit, nstep;
-          if (!init.tonumber(ninit)) {}
-          if (!limit.tonumber(nlimit)) {}
-          if (!step.tonumber(nstep)) {}
+          if (!tonumber(init, ninit)) {}
+          if (!tonumber(limit, nlimit)) {}
+          if (!tonumber(step, nstep)) {}
           // TODO: Error if number conversion fails
-          limit.data.emplace<lua_number>(nlimit);
-          init.data.emplace<lua_number>(ninit - nstep);
-          step.data.emplace<lua_number>(nstep);
+          limit.emplace<lua_number>(nlimit);
+          init.emplace<lua_number>(ninit - nstep);
+          step.emplace<lua_number>(nstep);
         }
         RL_quokka_vm_PC(_ci_ref) += opcode_util::get_sBx(_instruction);
         break;
@@ -630,7 +630,7 @@ void quokka_vm::execute() {
       case opcode::OP_TFORLOOP: {
         // if R(A+1) ~= nil then { R(A) = R(A+1); pc += sBx }
         lua_value &tv1 = _registers[_ra + 1];
-        if (!tv1.is_nil()) {
+        if (is_assigned(tv1)) {
           _registers.emplace(_ra, tv1);
           RL_quokka_vm_PC(_ci_ref) += opcode_util::get_sBx(_instruction);
         }
@@ -647,7 +647,7 @@ void quokka_vm::execute() {
         size_t fpf = 50;
         size_t b = _arg_b;
         size_t c = _arg_c;
-        lua_table &table = _registers[_ra].obj().get()->table();
+        lua_table &t = table(_registers[_ra]);
 
         if (b == 0) {
           // b = reg top - ra - 1
@@ -662,7 +662,7 @@ void quokka_vm::execute() {
         // Work backwards, saves us assigning a new iterator var
         lua_integer table_idx = ((c - 1) * fpf + b);
         for (; b > 0; b--) {
-          table.set(table_idx--, _registers[_ra + b]);
+          t.set(table_idx--, _registers[_ra + b]);
         }
 
         // Pop the stack constants
@@ -671,7 +671,7 @@ void quokka_vm::execute() {
       }
       case opcode::OP_CLOSURE: {
         // R(A) = closure(KPROTO[Bx])
-        lua_closure &this_closure = (*_cl_ref)->lua_func();
+        lua_closure &this_closure = lua_func(_cl_ref);
         bytecode_prototype &proto = *this_closure.proto->protos[opcode_util::get_Bx(_instruction)];
         object_view cache = lclosure_cache(proto, _base, _cl_ref);
         if (cache.is_valid()) {
@@ -685,7 +685,7 @@ void quokka_vm::execute() {
         // R(A) R(A+1) ... R(A+B-2) = vararg
         // b = required results
         int b = _arg_b - 1;
-        int n = (_base - (*_ci_ref)->func_idx) - (*_cl_ref)->lua_func().proto->num_params - 1;
+        int n = (_base - (*_ci_ref).func_idx) - lua_func(_cl_ref).proto->num_params - 1;
         // Less args than params
         if (n < 0)
           n = 0;
@@ -792,7 +792,7 @@ object_view quokka_vm::lclosure_cache(bytecode_prototype &proto, size_t base, ob
 object_view quokka_vm::lclosure_new(bytecode_prototype &proto, size_t base, object_view parent_cl) {
   int num_upval = proto.num_upvalues;
   object_view new_closure = alloc_object();
-  lua_closure &ncl = (*new_closure)->lua_func();
+  lua_closure &ncl = (*new_closure).data.emplace<lua_closure>();
   ncl.proto = &proto;
   
   // Assign each upval
@@ -817,12 +817,12 @@ object_view quokka_vm::lclosure_new(bytecode_prototype &proto, size_t base, obje
       // Upval could not be found - make a new one
       if (!upval_found) {
         upval_view uvr = alloc_upval();
-        (*uvr)->value.emplace<size_t>(level);
+        (*uvr).value.emplace<size_t>(level);
         ncl.upval_views.emplace(i, uvr);
       }
     } else {
       // Use upval from parent function
-      ncl.upval_views.emplace(i, (*parent_cl)->lua_func().upval_views[v.idx]);
+      ncl.upval_views.emplace(i, lua_func(parent_cl).upval_views[v.idx]);
     }
   }
 

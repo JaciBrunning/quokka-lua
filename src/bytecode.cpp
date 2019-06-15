@@ -161,9 +161,9 @@ void bytecode_reader::read_function(bytecode_architecture arch, bytecode_prototy
       /* NUM_INTEGER */
       func.constants.emplace_back(read_lua_integer(arch));
     } else if (ltt == lua_tag_type::STRING) {
-      lua_value &val = func.constants.emplace_back("");
+      lua_value &val = func.constants.emplace_back();
       // read_lua_string(*this, arch, *val.value_string());
-      read_lua_string(*this, arch, std::get<lua_string>(val));
+      read_lua_string(*this, arch, val.emplace<lua_string>());
     }
   }
 
