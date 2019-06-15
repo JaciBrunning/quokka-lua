@@ -24,12 +24,14 @@ namespace engine {
   enum class lua_tag_type {
     NIL = 0,
     BOOL = 1, 
-    // light_user_data ignored
+    // light_user_data ignored - in quokka, we only have user_data
     NUMBER = 3, // Note: internally, NUMBER can be either a float or an integer internally. See lua_value for info.
     STRING = 4,
     TABLE = 5,
-    FUNC = 6    // Note: internally, FUNC can be either a Lua closure or a Native closure. See lua_object for info.
-    // user_data and thread ignored
+    FUNC = 6,    // Note: internally, FUNC can be either a Lua closure or a Native closure. See lua_object for info.
+    USER_DATA = 7,
+    // thread ignored
+    OBJECT = 100  // Objects are never committed to bytecode, but to retain constexpr get_tag_type, we need to let the user handle their own indirection
   };
 
   /**
@@ -123,9 +125,7 @@ namespace engine {
    * simple_variant. Because of this, all lua_values are the same size, regardless of the 
    * data they hold. 
    */
-  using lua_value = std::variant<lua_nil, bool, lua_number, lua_integer, lua_string, object_view>;
-
-  lua_tag_type get_tag_type(const lua_value &v);
+  using lua_value = std::variant<lua_nil, bool, lua_number, lua_integer, lua_string, object_view, void *>;
   
   constexpr bool is_numeric(const lua_value &v) {
     return is<lua_integer>(v) || is<lua_number>(v);
@@ -316,6 +316,27 @@ namespace engine {
 
   inline lua_native_closure &native_func(lua_value &v) {
     return native_func(object(v));
+  }
+
+  constexpr lua_tag_type get_tag_type(const lua_object &o) {
+    return std::visit(overloaded {
+      [&](lua_nil) -> lua_tag_type { return lua_tag_type::NIL; },
+      [&](lua_table) -> lua_tag_type { return lua_tag_type::TABLE; },
+      [&](lua_closure) -> lua_tag_type { return lua_tag_type::FUNC; },
+      [&](lua_native_closure) -> lua_tag_type { return lua_tag_type::FUNC; }
+    }, o.data);
+  }
+
+  constexpr lua_tag_type get_tag_type(const lua_value &v) {
+    return std::visit(overloaded {
+      [&](lua_nil) -> lua_tag_type { return lua_tag_type::NIL; },
+      [&](bool) -> lua_tag_type { return lua_tag_type::BOOL; },
+      [&](lua_number) -> lua_tag_type { return lua_tag_type::NUMBER; },
+      [&](lua_integer) -> lua_tag_type { return lua_tag_type::NUMBER; },
+      [&](lua_string) -> lua_tag_type { return lua_tag_type::STRING; },
+      [&](void *) -> lua_tag_type { return lua_tag_type::USER_DATA; },
+      [&](object_view) -> lua_tag_type { return lua_tag_type::OBJECT; }
+    }, v);
   }
 
   /**
