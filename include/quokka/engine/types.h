@@ -108,7 +108,8 @@ namespace engine {
   /**
    * String type for values
    */
-  using value_string_t = small_string<16>;
+  using lua_string = small_string<16>;
+  using lua_nil = std::monostate;
 
   // Fwd decls
   struct bytecode_prototype;
@@ -121,164 +122,41 @@ namespace engine {
    * lua_value is polymorphic, in similar representation to a C-style union due to the use of
    * simple_variant. Because of this, all lua_values are the same size, regardless of the 
    * data they hold. 
-   * 
-   * The type of the lua_value can be determined using one of the following methods:
-   *    - is_* functions
-   *    - is<type>(data)
-   * For example, `value.is_numeric()` or `is<bool>(value.data)`
-   * 
-   * The value of the lua_value can be obtained through one of the following methods.
-   *    - std::get<type>(data)    Note this does NOT check the data type, you should check the type prior to calling
-   *    - obj()->get()        Shortcut for accessing an object, through which table and function types can be accessed.
-   *                          Note that this does not check data type.
-   *    - to* conversion functions  Convert types if applicable. These do perform type checking and coercion where necessary
    */
-  struct lua_value {
-    using string_t = value_string_t;
+  using lua_value = std::variant<lua_nil, bool, lua_number, lua_integer, lua_string, object_view>;
 
-    /**
-     * Data storage for the lua_value. 
-     * 
-     * <unassigned>: Nil
-     * bool: Boolean
-     * lua_number: Number (float)
-     * lua_integer: Number (integer)
-     * string_t: String
-     * object_view: Ref to lua_object in object store
-     */
-    optional_variant<bool, lua_number, lua_integer, string_t, object_view> data;
+  lua_tag_type get_tag_type(const lua_value &v);
+  
+  bool tonumber(const lua_value &v, lua_number &out);
+  bool tointeger(const lua_value &v, lua_integer &out);
+  bool tostring(const lua_value &v, lua_string &out);
 
-    /**
-     * Create a new lua_value of type Nil
-     */
-    lua_value();             // Nil
-    /**
-     * Create a new lua_value of type Bool
-     */
-    lua_value(bool);         // Bool
-    /**
-     * Create a new lua_value of type Integer
-     */
-    lua_value(lua_integer);  // Int
-    /**
-     * Create a new lua_value of type Number (decimal)
-     */
-    lua_value(lua_number);   // Float/Double
-    /**
-     * Create a new lua_value of type Object
-     */
-    lua_value(object_view);   // Obj (table, function)
-    /**
-     * Create a new lua_value of type String
-     */
-    lua_value(const char *);   // String
+  inline lua_number tonumber(const lua_value &v) {
+    lua_number n = 0;
+    tonumber(v, n);
+    return n;
+  }
 
-    /**
-     * Get the tag type of the value
-     */
-    lua_tag_type get_tag_type() const;
+  inline lua_integer tointeger(const lua_value &v) {
+    lua_integer i = 0;
+    tointeger(v, i);
+    return i;
+  }
 
-    /**
-     * Is this value nil?
-     */
-    bool is_nil() const;
+  inline lua_string tostring(const lua_value &v) {
+    lua_string s("");
+    tostring(v, s);
+    return s;
+  }
 
-    /**
-     * Is this value falsey? (Nil or False)
-     */
-    bool is_falsey() const;
+  inline object_view object(const lua_value &val) {
+    return std::get<object_view>(val);
+  }
 
-    /**
-     * Is this value numeric? (Integer or Decimal Number)
-     */
-    inline bool is_numeric() const {
-      return is<lua_number>(data) || is<lua_integer>(data);
-    }
-
-    /**
-     * Is this value an integer?
-     */
-    inline bool is_integer() const { return is<lua_integer>(data); }
-    /**
-     * Is this value a decimal? (Number)
-     */
-    inline bool is_decimal() const { return is<lua_number>(data); }
-    
-    /**
-     * Is this value a boolean?
-     */
-    inline bool is_bool() const { return is<bool>(data); }
-    /**
-     * Is this value a string?
-     */
-    inline bool is_string() const { return is<string_t>(data); }
-
-    /**
-     * Is this value an object? (Table or Function)
-     */
-    inline bool is_object() const { return is<object_view>(data); }
-
-    /**
-     * Get the value of this lua_value as an object.
-     */
-    object_view obj() const;
-
-    /**
-     * Convert this value to a number. Can convert a number, integer, or
-     * string.
-     * @param out The output number
-     * @return True if the value was successfully converted
-     */
-    bool tonumber(lua_number &out) const;
-    /**
-     * Convert this value to an integer. Can convert a number, integer, or
-     * string.
-     * @param out The output integer
-     * @return True if the value was successfully converted
-     */
-    bool tointeger(lua_integer &out) const;
-    /**
-     * Convert this value to a string. Can convert any lua type
-     * @param out The output string
-     * @return True if the value was successfully converted
-     */
-    bool tostring(string_t &out) const;
-
-    /**
-     * Convert this value to a number, or 0 if the conversion was unsuccessful
-     * @return The number, or 0 if the conversion failed.
-     */
-    inline lua_number tonumber() const {
-      lua_number n = 0;
-      tonumber(n);
-      return n;
-    }
-
-    /**
-     * Convert this value to an integer, or 0 if the conversion was unsuccessful
-     * @return The integer, or 0 if the conversion failed.
-     */
-    inline lua_integer tointeger() const {
-      lua_integer i = 0;
-      tointeger(i);
-      return i;
-    }
-
-    /**
-     * Convert this value to a string, or "" (empty string) if the conversion was unsuccessful
-     * @return The number, or "" (empty string) if the conversion failed.
-     */
-    inline string_t tostring() const {
-      string_t s("");
-      tostring(s);
-      return s;
-    }
-    
-    bool operator==(const lua_value &) const;
-    bool operator<(const lua_value &) const;
-    bool operator<=(const lua_value &) const;
-  };
-
+  inline bool falsey(const lua_value &val) {
+    return is<lua_nil>(val) || (is<bool>(val) && !std::get<bool>(val));
+  }
+  
   /**
    * A lua_table is the implementation of the Lua table datatype, allowing for a key-value store.
    * Note that in Quokka, we implement this as an array of pairs, to save on memory.
@@ -314,10 +192,10 @@ namespace engine {
   };
 
   /**
-   * lua_lua_closure is the implementation of a closure (function) implemented in Lua, including
+   * lua_closure is the implementation of a closure (function) implemented in Lua, including
    * references to its upvals and bytecode prototype.
    */
-  struct lua_lua_closure {
+  struct lua_closure {
     bytecode_prototype *proto;
     small_vector<upval_view, 4> upval_views;
   };
@@ -343,21 +221,37 @@ namespace engine {
    * A value may hold an object (or rather, a reference to an object), but an object is not a value.
    */
   struct lua_object : public refcountable {
-    optional_variant<lua_table, lua_lua_closure, lua_native_closure> data;
-
-    lua_object();
-
-    lua_table &table();
-    lua_lua_closure &lua_func();
-    lua_native_closure &native_func();
-
-    lua_tag_type get_tag_type() const;
+    optional_variant<lua_table, lua_closure, lua_native_closure> data;
 
     inline bool is_table() const { return is<lua_table>(data); }
     inline bool is_function() const { return !is_table(); };
 
     void on_refcount_zero() override;
   };
+
+  inline lua_table &table(object_view v) {
+    return std::get<lua_table>((*v).data);
+  }
+
+  inline lua_table &table(lua_value &v) {
+    return table(object(v));
+  }
+
+  inline lua_closure &lua_func(object_view v) {
+    return std::get<lua_closure>((*v).data);
+  }
+
+  inline lua_closure &lua_func(lua_value &v) {
+    return lua_func(object(v));
+  }
+
+  inline lua_native_closure &native_func(object_view v) {
+    return std::get<lua_native_closure>((*v).data);
+  }
+
+  inline lua_native_closure &native_func(lua_value &v) {
+    return native_func(object(v));
+  }
 
   /**
    * The Upval is a construct of Lua that allows for values to exist oustide of their

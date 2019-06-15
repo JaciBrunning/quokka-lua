@@ -19,7 +19,7 @@ int main() {
   quokka_vm v(chunk);
 
   v.define_native_function("print", [](quokka_vm &v) {
-    std::cout << v.argument(0).tostring().c_str() << std::endl;
+    std::cout << tostring(v.argument(0)).c_str() << std::endl;
     return 0;
   });
 
@@ -27,13 +27,13 @@ int main() {
     std::visit([&vm](auto &&t) {
       using T = typename std::decay<decltype(t)>::type;
       vm.push(typeid(T).name());
-    }, vm.argument(0).data);
+    }, vm.argument(0));
 
     return 1;
   });
   
   object_view os = v.alloc_object();
-  (*os)->table().set("clock", v.alloc_native_function([](quokka_vm &v) {
+  (*os).data.emplace<lua_table>().set("clock", v.alloc_native_function([](quokka_vm &v) {
     v.push( (double)(clock()) / (double)(CLOCKS_PER_SEC) );
     return 1;
   }));

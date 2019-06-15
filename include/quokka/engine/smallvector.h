@@ -67,7 +67,7 @@ class small_vector_base : public small_vector_impl {
 
   void chop(size_t top) override {
     for (size_t i = top; i < _size; i++)
-      (&raw_buffer()[i])->~T();
+      (raw_buffer()[i]).~T();
     if (top < _size)
       _size = top;
   }
@@ -129,7 +129,7 @@ class small_vector : public small_vector_base<T> {
   template<class... Args>
   T& emplace(size_t pos, Args&&... args) {
     if (pos < this->_size) {
-      (&raw_buffer()[pos])->~T();
+      (raw_buffer()[pos]).~T();
     } else {
       while (pos >= _alloced_size)
         grow(this->_size + GROW_BY);
@@ -193,11 +193,8 @@ struct continuous_reference {
   continuous_reference() : vec(nullptr) {}
   continuous_reference(small_vector_base<T> *v, size_t i) : vec(v), idx(i) {}
 
-  /**
-   * Get the pointer that this reference points to.
-   */
-  T *operator*() const {
-    return &vec->operator[](idx);
+  T &operator*() const {
+    return vec->operator[](idx);
   }
 
   /**

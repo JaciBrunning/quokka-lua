@@ -1,6 +1,7 @@
 #pragma once
 
 #include "smallvector.h"
+#include <cstring>
 
 namespace quokka {
 namespace engine {
@@ -106,6 +107,30 @@ namespace engine {
         concat(*other);
         other++;
       }
+    }
+
+    inline bool operator==(const small_string &other) const {
+      return this->length() == other.length() && strcmp(this->c_str(), other.c_str()) == 0;
+    }
+
+    inline bool operator!=(const small_string &other) const {
+      return !(*this == other);
+    }
+
+    inline bool operator<=(const small_string &other) const {
+      return strcmp(this->c_str(), other.c_str()) <= 0;
+    }
+
+    inline bool operator<(const small_string &other) const {
+      return strcmp(this->c_str(), other.c_str()) < 0;
+    }
+
+    inline bool operator>=(const small_string &other) const {
+      return strcmp(this->c_str(), other.c_str()) >= 0;
+    }
+
+    inline bool operator>(const small_string &other) const {
+      return strcmp(this->c_str(), other.c_str()) > 0;
     }
   };
 }

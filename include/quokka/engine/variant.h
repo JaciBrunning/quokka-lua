@@ -39,6 +39,14 @@ namespace engine {
     var.template emplace<std::monostate>();
   }
 
+  template <typename U, typename ...Args, typename... T, typename = variant_enable<U, T...>>
+  constexpr U &get_or_set(const std::variant<T...> &var, Args&&... a) {
+    if (!is<U>(var)) {
+      var.template emplace<U>(std::forward<Args>(a)...);
+    }
+    return std::get<U>(var);
+  }
+
   /* Helpers for std::visit */
   template<class... Ts> struct overloaded : Ts... { using Ts::operator()...; };
   template<class... Ts> overloaded(Ts...) -> overloaded<Ts...>;
