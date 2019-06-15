@@ -13,6 +13,4 @@ for i=1,1000 do
 end
 end_time = os.clock()
 
-print(native_type(13.4))
-
 print("Benchmark: " .. (end_time - start_time) .. " second(s)")
