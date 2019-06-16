@@ -180,40 +180,5 @@ class small_vector : public small_vector_base<T> {
   alignas(alignof(T)) char _stackvec[STACK_SIZE * sizeof(T)];
   size_t _alloced_size = STACK_SIZE;
 };
-
-/**
- * A continuous_reference is an iterator-like reference to an element in a small_vector, that does
- * not invalidate when the vector is grown / reallocated.
- */
-template<typename T>
-struct continuous_reference {
-  small_vector_base<T> *vec;
-  size_t idx;
-
-  continuous_reference() : vec(nullptr) {}
-  continuous_reference(small_vector_base<T> *v, size_t i) : vec(v), idx(i) {}
-
-  T &operator*() const {
-    return vec->operator[](idx);
-  }
-
-  /**
-   * Get the pointer that this reference points to.
-   */
-  T* get() const {
-    return &vec->operator[](idx);
-  }
-
-  bool operator==(const continuous_reference &other) const {
-    return (vec == other.vec) && (idx == other.idx);
-  }
-
-  /**
-   * Is this reference valid?
-   */
-  bool is_valid() {
-    return vec != nullptr;
-  }
-};
 } // namespace engine
 } // namespace quokka

@@ -154,8 +154,8 @@ namespace engine {
     }
     
    private:
-    using call_ref = continuous_reference<lua_call>;
-    using reg_ref = continuous_reference<lua_value>;
+    using call_ref = small_vector_view<lua_call>;
+    using reg_ref = small_vector_view<lua_value>;
 
     // Return true if C function
     bool precall(size_t func_stack_idx, int nreturn);

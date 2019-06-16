@@ -33,7 +33,7 @@ int main() {
   });
   
   object_view os = v.alloc_object();
-  (*os).data.emplace<lua_table>().set("clock", v.alloc_native_function([](quokka_vm &v) {
+  os->emplace<lua_table>().set("clock", v.alloc_native_function([](quokka_vm &v) {
     v.push( (double)(clock()) / (double)(CLOCKS_PER_SEC) );
     return 1;
   }));

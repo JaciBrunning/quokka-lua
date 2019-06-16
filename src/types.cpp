@@ -5,23 +5,6 @@
 
 using namespace quokka::engine;
 
-void refcountable::use() {
-  refcount++;
-  is_free = false;
-}
-
-void refcountable::unuse() {
-  refcount--;
-  if (refcount == 0) {
-    is_free = true;
-    on_refcount_zero();
-  }
-}
-
-void lua_object::on_refcount_zero() {
-  unassign(data);
-}
-
 bool ::quokka::engine::tonumber(const lua_value &v, lua_number &out) {
   bool ret = true;
   std::visit(overloaded {
@@ -77,7 +60,7 @@ bool ::quokka::engine::tostring(const lua_value &v, lua_string &out) {
     },
     [&](object_view v) {
       out.clear();
-      out.concat((*v).is_table() ? "table: <unknown>" : "function: <unknown>");
+      out.concat(is<lua_table>(*v) ? "table: <unknown>" : "function: <unknown>");
     }
   }, v);
   return ret;
@@ -100,8 +83,4 @@ void lua_table::set(const lua_value &k, const lua_value &v) {
   }
 
   entries.emplace_back(k, v);
-}
-
-void lua_upval::on_refcount_zero() {
-  unassign(value);
 }
